@@ -684,3 +684,19 @@ _(Codex: one line per finished step. Format: `- [step id] YYYY-MM-DD — what wa
 - [Step 6.4] Stages 2 and 3 — not started: the plan requires explicit approval after phase-4 acceptance, which has not been given.
 - [Fixes from user screenshots] 2026-10-01 — repair gear no longer floats: hood slab, engine and radiator cap show only while the hood is open (the car model supplies the closed hood), toolbox/spares/wrench/water show only while the driver is on foot, fuel flap sits flush with the body; PIT STOP banner moved under the timer and the mouse hint to the bottom row; added `/rally` lobby menu (create or join by code) with a link on the start screen. Closed-hood chase view checked in headless Chromium; the open-hood and on-foot views were not re-checked.
 - [Repair tweak] 2026-10-01 — per user: every repair action is now a single E press (inspect/remove part, fit spare, radiator cap; water and hood latch remain holds), and either teammate can repair from outside the car (server checks that teammate's own seat/foot state and distance); ignition by whoever is seated. Pit refuelling is still co-driver only. Not re-checked in a browser.
+
+---
+
+# PHASE 7 — Road network ("maze"): forks, alternative routes, dead ends (user request)
+
+**Design (user chose "option B": several routes to the finish with dead ends; the co-driver finds the way).**
+- The existing road stays the **reference route** (`stage.samples`, arc length `s`). Everything that already uses `s` (gates, checkpoints, finish, pit, server progress, autopilot) keeps working.
+- New `stage.branches: RoadBranch[]`, each with its own `samples`/`corners` (local arc length) and a kind:
+  - `alternative`: leaves the reference at `forkS` and rejoins at `joinS`; shorter or longer than the reference stretch it replaces.
+  - `dead_end`: leaves at `forkS` and ends in the forest.
+- **Progress on a branch** maps to an equivalent reference arc length: alternatives interpolate `forkS → joinS` by the fraction driven (so a longer detour is slower); dead ends hold `forkS` (no progress). Gates, checkpoints and the pit are never placed inside a fork zone, so checkpoint logic is unchanged.
+- `NetworkIndex` (reference + branches) answers `nearest()` with the equivalent `s`, plus `branchId` and `localS`.
+- **Wrong turns:** staying on a dead end beyond a grace distance costs a navigation penalty once per visit; R respawns at the junction.
+- **Co-driver puzzle:** the tablet map is fog-of-war (explored roads plus a short view radius around the car) and shows a bearing/distance to the finish; junction pace calls say which sides roads leave to, but never which is right.
+- Steps: 7.0 data model + `NetworkIndex`; 7.1 branch generation, elevation, terrain, mesh, validation; 7.2 props around branches; 7.3 wrong-turn penalties + reset; 7.4 junction pace notes; 7.5 fog-of-war tablet + finish bearing; 7.6 regression (autopilot, server routes) and docs.
+- Deliberate simplification vs a full graph: one level of forks (no branches off branches) and a single reference route for gates/notes.
