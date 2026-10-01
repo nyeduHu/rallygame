@@ -50,6 +50,7 @@ function createLatchSpec(): InteractableSpec {
  */
 export function EngineBay() {
   const hoodRef = useRef<Group>(null);
+  const hoodOpen = useGameStore((state) => state.hoodOpen);
 
   const latch = useMemo(() => createLatchSpec(), []);
 
@@ -62,10 +63,11 @@ export function EngineBay() {
 
   return (
     <group name="engine-bay">
-      <group ref={hoodRef} position={[...HOOD_HINGE]}>
+      {/* The car model supplies the closed hood; our slab and the engine only appear while open. */}
+      <group ref={hoodRef} position={[...HOOD_HINGE]} visible={hoodOpen}>
         <mesh position={[0, 0, HOOD_PANEL_OFFSET_Z]} castShadow>
           <boxGeometry args={[...HOOD_SIZE]} />
-          <meshStandardMaterial color={PALETTE.carBody} flatShading />
+          <meshStandardMaterial color={COCKPIT.ENGINE_BAY.HOOD_COLOR} flatShading />
         </mesh>
       </group>
       <Interactable spec={latch}>
@@ -74,10 +76,12 @@ export function EngineBay() {
           <meshStandardMaterial color={PALETTE.lever} flatShading />
         </mesh>
       </Interactable>
-      <mesh position={[...BLOCK_POSITION]} receiveShadow>
-        <boxGeometry args={[...BLOCK_SIZE]} />
-        <meshStandardMaterial color={PALETTE.interiorLight} flatShading />
-      </mesh>
+      <group visible={hoodOpen}>
+        <mesh position={[...BLOCK_POSITION]} receiveShadow>
+          <boxGeometry args={[...BLOCK_SIZE]} />
+          <meshStandardMaterial color={PALETTE.interiorLight} flatShading />
+        </mesh>
+      </group>
       <RepairParts />
       <EngineSmoke />
     </group>

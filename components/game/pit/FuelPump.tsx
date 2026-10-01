@@ -218,7 +218,7 @@ function CarFlap({ session, flapSpec: spec }: CarFlapProps) {
     <group ref={ref}>
       <Interactable spec={spec}>
         <mesh position={[...REFUEL.FLAP_LOCAL]}>
-          <boxGeometry args={[0.04, 0.2, 0.2]} />
+          <boxGeometry args={[0.03, 0.18, 0.2]} />
           <meshStandardMaterial color={PALETTE.carBodyDark} flatShading />
         </mesh>
       </Interactable>

@@ -616,7 +616,7 @@ export const REFUEL = {
   /** Co-driver must be within this distance of the car flap or pump to act. */
   MAX_DISTANCE_M: 3,
   /** Fuel flap position on the car (car-local: right/passenger side rear). */
-  FLAP_LOCAL: [-1.0, 0.45, -1.3] as readonly [number, number, number],
+  FLAP_LOCAL: [-0.93, 0.45, -1.3] as readonly [number, number, number],
 } as const;
 
 /** Checkpoint spacing limits. */

@@ -162,7 +162,8 @@ interface TintedProps {
 function Visible({ part, children }: TintedProps) {
   const broken = useGameStore((state) => state.mech.brokenPart === part && state.hoodOpen);
   const removed = useGameStore((state) => state.repair.kind === "part_removed" && state.repair.part === part);
-  return <group visible={!removed}>{children(broken ? TINT_BROKEN : PART_COLOR)}</group>;
+  const hoodOpen = useGameStore((state) => state.hoodOpen);
+  return <group visible={!removed && hoodOpen}>{children(broken ? TINT_BROKEN : PART_COLOR)}</group>;
 }
 
 /**
@@ -214,6 +215,9 @@ export function RepairParts() {
     [],
   );
 
+  const driverOut = useGameStore((state) => state.footRole === "driver");
+  const hoodOpen = useGameStore((state) => state.hoodOpen);
+
   const spareSlot = (index: number): [number, number, number] => [
     BAY.SPARES_X,
     0.12,
@@ -257,6 +261,7 @@ export function RepairParts() {
         </Visible>
       </Interactable>
 
+      <group visible={driverOut}>
       <mesh position={[...BAY.TOOLBOX.POSITION]} castShadow>
         <boxGeometry args={[...BAY.TOOLBOX.SIZE]} />
         <meshStandardMaterial color={PALETTE.steeringHub} flatShading />
@@ -287,18 +292,22 @@ export function RepairParts() {
         </mesh>
       </Interactable>
 
-      <Interactable spec={cap}>
-        <mesh position={[...BAY.CAP.POSITION]}>
-          <cylinderGeometry args={[BAY.CAP.RADIUS, BAY.CAP.RADIUS, BAY.CAP.HEIGHT, 10]} />
-          <meshStandardMaterial color={PALETTE.carBodyDark} flatShading />
-        </mesh>
-      </Interactable>
       <Interactable spec={water}>
         <mesh position={[...BAY.WATER_BOTTLE.POSITION]}>
           <cylinderGeometry args={[BAY.WATER_BOTTLE.RADIUS, BAY.WATER_BOTTLE.RADIUS, BAY.WATER_BOTTLE.HEIGHT, 10]} />
           <meshStandardMaterial color="#6fb4e8" flatShading />
         </mesh>
       </Interactable>
+
+      </group>
+      <group visible={hoodOpen}>
+      <Interactable spec={cap}>
+        <mesh position={[...BAY.CAP.POSITION]}>
+          <cylinderGeometry args={[BAY.CAP.RADIUS, BAY.CAP.RADIUS, BAY.CAP.HEIGHT, 10]} />
+          <meshStandardMaterial color={PALETTE.carBodyDark} flatShading />
+        </mesh>
+      </Interactable>
+      </group>
 
       <Interactable spec={ignition}>
         <mesh position={[...BAY.IGNITION_POSITION]}>
