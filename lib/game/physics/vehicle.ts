@@ -16,6 +16,8 @@ export interface DriverControls {
   /** -1 = full left, 1 = full right. */
   steer: number;
   handbrake: boolean;
+  /** Engine output multiplier (0..1) from the mechanical model; defaults to 1. */
+  powerFactor?: number;
 }
 
 /** Per-wheel simulation state, also read by visuals (suspension travel, spin). */
@@ -233,7 +235,7 @@ export class Vehicle {
     const steerAngle = -this.steer * maxSteer;
 
     const output = this.drivetrain.update(
-      { throttleKey: controls.throttle, brakeKey: controls.brake },
+      { throttleKey: controls.throttle, brakeKey: controls.brake, powerFactor: controls.powerFactor },
       this.forwardSpeed,
       dt,
     );

@@ -28,6 +28,8 @@ export const SEED = {
   ATTEMPT_SALT: 0x9e3779b1,
   /** Salt for the per-stage weather plan. */
   WEATHER_SALT: 0x57ea7e5,
+  /** Salt for the seeded part-failure stream. */
+  FAILURES_SALT: 0xfa11ed,
 } as const;
 
 /** Road layout and validation. */
@@ -466,4 +468,43 @@ export const WIPERS = {
   /** Switch lever tilt (radians) when on, and its damping. */
   SWITCH_ON_TILT: 0.5,
   SWITCH_DAMPING: 14,
+} as const;
+
+/**
+ * Engine, fuel, temperature and damage model. Fuel calc: stages run about 170 s at the slowest;
+ * 1.35 x 230 s of "moderate load" (throttle x rpm = 0.4) must fit in one tank, so
+ * FUEL_IDLE + FUEL_PER_LOAD x 0.4 = 0.42 units/s stays under TANK / 230 = 0.435 units/s.
+ */
+export const MECHANICS = {
+  TANK_CAPACITY_UNITS: 100,
+  FUEL_IDLE: 0.1,
+  FUEL_PER_LOAD: 0.8,
+  FUEL_RANGE_MULTIPLIER: 1.35,
+  HEAT_PER_LOAD: 0.05,
+  HEAT_DAMAGE: 0.03,
+  COOL_BASE: 0.01,
+  COOL_PER_SPEED: 0.04,
+  COOL_HOOD_OPEN: 0.06,
+  COOL_PER_AMBIENT: 0.01,
+  MAX_SPEED_MS: 30,
+  OVERHEAT_WARN: 0.85,
+  OVERHEAT_FAIL: 1,
+  OVERHEAT_FAIL_SECONDS: 6,
+  /** Overheat clears below this temperature. */
+  OVERHEAT_RECOVER: 0.6,
+  OVERHEAT_POWER_FLOOR: 0.55,
+  HEALTH_LOSS_OVERHEAT_PER_S: 0.02,
+  /** Engine health lost per newton-second of impact beyond the free threshold. */
+  HEALTH_PER_IMPULSE: 1 / 90000,
+  /** Impacts below this are free (kerbs, cones). */
+  IMPACT_FREE_THRESHOLD: 1500,
+  DAMAGE_PER_IMPULSE: 1 / 60000,
+  /** A crash is an impact at least this hard. */
+  CRASH_IMPULSE: 8000,
+  P_BREAK_ON_CRASH: 0.5,
+  /** Power lost at full body damage. */
+  DAMAGE_POWER_LOSS: 0.3,
+  TIRE_WEAR_PER_S_GRAVEL: 0.0005,
+  TIRE_WEAR_PER_S_GRASS: 0.0012,
+  DEFAULT_AMBIENT: 0.5,
 } as const;
