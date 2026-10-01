@@ -32,7 +32,8 @@ describe("server-authoritative repair", () => {
     expect(controller.repairStep(team.id, "driver", { step: "OPEN_HOOD" })).toBe("not_on_foot");
     expect(controller.setSeat(team.id, "driver", "foot")).toBeNull();
     expect(controller.repairStep(team.id, "driver", { step: "GRAB_TOOL" })).toBe("illegal_step");
-    expect(controller.repairStep(team.id, "codriver", { step: "OPEN_HOOD" })).toBe("not_allowed");
+    // The co-driver can repair too, but only from outside the car.
+    expect(controller.repairStep(team.id, "codriver", { step: "OPEN_HOOD" })).toBe("not_on_foot");
 
     expect(controller.repairStep(team.id, "driver", { step: "OPEN_HOOD" })).toBeNull();
     expect(controller.repairStep(team.id, "driver", { step: "INSPECT", partId: "spark_plug" })).toBeNull();

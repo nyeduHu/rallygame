@@ -27,8 +27,8 @@ function createLatchSpec(): InteractableSpec {
   return {
     id: "hood-latch",
     kind: "hold",
-    roles: ["driver"],
-    isEnabled: () => useGameStore.getState().footRole === "driver",
+    roles: ["driver", "codriver"],
+    isEnabled: () => useGameStore.getState().footRole !== null,
     label: "Hood latch (hold)",
     getObjects: () => [],
     onPress: () => {
