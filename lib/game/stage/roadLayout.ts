@@ -113,26 +113,11 @@ export function generateRoadLayout(rng: Rng): RoadLayout {
 }
 
 /**
- * Validates minimum corner variety and that road parts far apart along the route
- * never come close in space, ruling out unplayable routes and crossings.
- * @param layout - Road layout candidate.
- * @returns True when the layout is usable.
+ * Minimum corner variety (the separation and other fairness checks live in `validateStage`).
+ * @param layout - Candidate layout.
+ * @returns True when there are enough corners and at least one severe one.
  */
-export function validateRoadLayout(layout: RoadLayout): boolean {
-  const { samples, corners } = layout;
-  const severeCornerCount = corners.filter((corner) => corner.classId === "hairpin" || corner.classId === "tight").length;
-  if (corners.length < ROAD.MIN_CORNERS || severeCornerCount < ROAD.MIN_SEVERE_CORNERS) return false;
-
-  const minSeparationSq = ROAD.MIN_SEPARATION * ROAD.MIN_SEPARATION;
-  for (let i = 0; i < samples.length; i++) {
-    const a = samples[i];
-    for (let j = i + 1; j < samples.length; j++) {
-      const b = samples[j];
-      if (b.s - a.s < ROAD.SEPARATION_ARC_EXEMPT) continue;
-      const dx = a.x - b.x;
-      const dz = a.z - b.z;
-      if (dx * dx + dz * dz < minSeparationSq) return false;
-    }
-  }
-  return true;
+export function hasEnoughCorners(layout: RoadLayout): boolean {
+  const severeCornerCount = layout.corners.filter((corner) => corner.classId === "hairpin" || corner.classId === "tight").length;
+  return layout.corners.length >= ROAD.MIN_CORNERS && severeCornerCount >= ROAD.MIN_SEVERE_CORNERS;
 }

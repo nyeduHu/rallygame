@@ -60,6 +60,11 @@ export const ROAD = {
   /** Hairpins are only allowed when the road is roughly on its main heading. */
   HAIRPIN_HEADING_LIMIT: 30 * DEG_TO_RAD,
   MAX_GENERATION_ATTEMPTS: 60,
+  /** No corner may be tighter than this radius. */
+  MIN_RADIUS: 12,
+  /** Minimum straight between consecutive corners, except deliberate linked corners. */
+  MIN_STRAIGHT_BETWEEN: 20,
+  MIN_LINK_STRAIGHT: 6,
   MIN_CORNERS: 8,
   MIN_SEVERE_CORNERS: 1,
   /** Non-adjacent road parts must stay this far apart (centreline to centreline). */
@@ -166,6 +171,10 @@ export const GATES = {
 
 /** Pace-note classification and callout distances. */
 export const PACE_NOTES = {
+  /** Longest note text the co-driver tablet and voice can handle. */
+  MAX_TEXT_LENGTH: 28,
+  /** More notes than this per 100 m cannot be read aloud. */
+  MAX_NOTES_PER_100M: 3,
   SEVERITY_BANDS: [
     { minimumRadius: 140, severity: 1 },
     { minimumRadius: 80, severity: 2 },
@@ -604,4 +613,27 @@ export const REFUEL = {
   MAX_DISTANCE_M: 3,
   /** Fuel flap position on the car (car-local: right/passenger side rear). */
   FLAP_LOCAL: [-1.0, 0.45, -1.3] as readonly [number, number, number],
+} as const;
+
+/** Checkpoint spacing limits. */
+export const CHECKPOINT = {
+  MIN_SPACING: 300,
+  MAX_SPACING: 900,
+  /** Checkpoints keep at least this far from a hairpin apex. */
+  MIN_DISTANCE_FROM_HAIRPIN_APEX: 20,
+} as const;
+
+/**
+ * Difficulty windows by stage index. Score = sum of corner severity weights; stage 0 is the
+ * low-difficulty tutorial. A stage outside its window is rejected and regenerated.
+ */
+export const DIFFICULTY = {
+  SEVERITY_WEIGHT: { hairpin: 4, tight: 3, medium: 2, fast: 1 },
+  STAGE: [
+    { min: 28, max: 41 },
+    { min: 34, max: 50 },
+    { min: 40, max: 62 },
+  ],
+  /** Stage 0 never has two hairpins closer than this along the road. */
+  STAGE0_HAIRPIN_SPACING: 300,
 } as const;
