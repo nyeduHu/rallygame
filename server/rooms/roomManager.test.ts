@@ -34,7 +34,7 @@ describe("room manager", () => {
   it("reconnects players using the stored resume token and drops empty rooms", () => {
     const manager = new RoomManager({ now: () => 0, emptyRoomAfterMs: 250 });
     const room = manager.createRoom("Host", { maxTeams: 1 });
-    const host = room.addPlayer("Host");
+    const host = room.players.get(room.hostId)!;
     const team = room.createTeam("Team");
 
     room.joinTeam(host.id, team.id, "driver");
@@ -48,8 +48,8 @@ describe("room manager", () => {
     manager.pruneExpiredRooms();
     expect(manager.rooms.has(room.code)).toBe(true);
 
+    room.disconnectPlayer(host.id, 0);
     manager.setNow(() => 500);
-    room.disconnectPlayer(host.id, manager.now());
     manager.pruneExpiredRooms();
     expect(manager.rooms.has(room.code)).toBe(false);
   });

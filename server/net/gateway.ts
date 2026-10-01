@@ -2,8 +2,20 @@
 import type { Server, Socket } from "socket.io";
 import { NET } from "../../lib/net/netConstants";
 import { type ClientEventName, clientEventSchemas } from "../../lib/net/protocol";
+import type { Room } from "../rooms/room";
 import { RoomManager } from "../rooms/roomManager";
 import { withValidatedSocket } from "./validate";
+
+/** Finds the room that owns a socket's player ID. */
+function roomForPlayer(roomManager: RoomManager, socket: Socket): Room | undefined {
+  const playerId = String(socket.data.playerId ?? "");
+  return [...roomManager.rooms.values()].find((room) => room.players.has(playerId));
+}
+
+/** Emits the latest room state to the current room members. */
+function emitRoomState(io: Server, room: Room): void {
+  io.to(room.code).emit("room:state", room.toView());
+}
 
 /** Creates a Socket.IO gateway for room lifecycle and state synchronization. */
 export function bindGateway(io: Server, roomManager: RoomManager): void {
@@ -18,18 +30,24 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
           const name = String(data.name ?? "");
           const maxTeams = typeof data.maxTeams === "number" ? Math.min(data.maxTeams, NET.MAX_TEAMS_LIMIT) : undefined;
           const room = roomManager.createRoom(name, { maxTeams });
-          const player = room.players.get(room.hostId);
+          const host = room.players.get(room.hostId);
+          if (!host) {
+            return { ok: false, error: "not_found" };
+          }
 
+          socket.data.playerId = host.id;
+          socket.join(room.code);
           return {
             ok: true,
             roomCode: room.code,
-            playerId: player?.id ?? room.hostId,
-            resumeToken: player?.resumeToken ?? "",
+            playerId: host.id,
+            resumeToken: host.resumeToken,
           };
         }
 
         if (event === "room:join") {
-          const room = roomManager.getRoom(String(data.roomCode ?? ""));
+          const roomCode = String(data.roomCode ?? "");
+          const room = roomManager.getRoom(roomCode);
           if (!room) {
             return { ok: false, error: "room_not_found" };
           }
@@ -37,6 +55,7 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
           const player = room.addPlayer(String(data.name ?? ""));
           socket.data.playerId = player.id;
           socket.join(room.code);
+          emitRoomState(io, room);
           return {
             ok: true,
             playerId: player.id,
@@ -45,53 +64,68 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
           };
         }
 
-        if (event === "player:ready") {
-          const playerId = String(socket.data.playerId ?? "");
-          const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
-          if (!room) {
-            return { ok: false, error: "not_found" };
-          }
-          const ready = Boolean(data.ready);
-          return room.setReady(playerId, ready);
-        }
-
-        if (event === "room:start") {
-          const playerId = String(socket.data.playerId ?? "");
-          const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
-          if (!room) {
-            return { ok: false, error: "not_found" };
-          }
-          return room.startRoom();
-        }
-
         if (event === "team:create") {
-          const playerId = String(socket.data.playerId ?? "");
-          const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
+          const room = roomForPlayer(roomManager, socket);
           if (!room) {
             return { ok: false, error: "not_found" };
           }
           const team = room.createTeam(`Team ${room.teams.size + 1}`);
+          emitRoomState(io, room);
           return { ok: true, teamId: team.id };
         }
 
         if (event === "team:join") {
-          const playerId = String(socket.data.playerId ?? "");
-          const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
+          const room = roomForPlayer(roomManager, socket);
           if (!room) {
             return { ok: false, error: "not_found" };
           }
-          const role = data.role as "driver" | "codriver";
+          const playerId = String(socket.data.playerId ?? "");
           const teamId = String(data.teamId ?? "");
-          return room.joinTeam(playerId, teamId, role);
+          const role = data.role as "driver" | "codriver";
+          const result = room.joinTeam(playerId, teamId, role);
+          if (result.ok) {
+            emitRoomState(io, room);
+          }
+          return result;
         }
 
         if (event === "team:leave") {
-          const playerId = String(socket.data.playerId ?? "");
-          const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
+          const room = roomForPlayer(roomManager, socket);
           if (!room) {
             return { ok: false, error: "not_found" };
           }
-          return room.leaveTeam(playerId);
+          const result = room.leaveTeam(String(socket.data.playerId ?? ""));
+          if (result.ok) {
+            emitRoomState(io, room);
+          }
+          return result;
+        }
+
+        if (event === "player:ready") {
+          const room = roomForPlayer(roomManager, socket);
+          if (!room) {
+            return { ok: false, error: "not_found" };
+          }
+          const result = room.setReady(String(socket.data.playerId ?? ""), Boolean(data.ready));
+          if (result.ok) {
+            emitRoomState(io, room);
+          }
+          return result;
+        }
+
+        if (event === "room:start") {
+          const room = roomForPlayer(roomManager, socket);
+          if (!room) {
+            return { ok: false, error: "not_found" };
+          }
+          if (room.hostId !== String(socket.data.playerId ?? "")) {
+            return { ok: false, error: "host_only" };
+          }
+          const result = room.startRoom();
+          if (result.ok) {
+            emitRoomState(io, room);
+          }
+          return result;
         }
 
         if (event === "clock:ping") {
@@ -111,13 +145,15 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
       if (!playerId) {
         return;
       }
-      const room = [...roomManager.rooms.values()].find((candidate) => candidate.players.has(playerId));
+
+      const room = roomForPlayer(roomManager, socket);
       if (!room) {
         return;
       }
+
       room.disconnectPlayer(playerId, Date.now());
       roomManager.pruneExpiredRooms();
-      io.to(room.code).emit("room:state", room.toView());
+      emitRoomState(io, room);
     });
   });
 }

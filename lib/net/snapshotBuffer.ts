@@ -30,6 +30,10 @@ export class SnapshotBuffer {
       return null;
     }
 
+    if (Math.abs(renderTimeMs - newest.seq) > this.limitMs) {
+      return newest;
+    }
+
     const target = ordered.find((snapshot) => snapshot.seq >= Math.max(0, newest.seq - 1)) ?? newest;
     return {
       ...target,

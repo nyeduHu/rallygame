@@ -3,7 +3,9 @@ import { createServer } from "node:http";
 import express from "express";
 import { Server } from "socket.io";
 import { env } from "./env.js";
+import { bindGateway } from "./net/gateway.js";
 import healthRouter from "./health.js";
+import { RoomManager } from "./rooms/roomManager.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,6 +17,8 @@ const io = new Server(httpServer, {
     origin: env.CLIENT_ORIGIN,
   },
 });
+const roomManager = new RoomManager();
+bindGateway(io, roomManager);
 
 /** Closes Socket.IO and its HTTP listener before the process exits.
  * @returns Resolves after the transport is closed.

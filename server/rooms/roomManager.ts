@@ -1,6 +1,5 @@
 // server/rooms/roomManager.ts
 import type { RoomPhase } from "../../lib/net/protocol";
-import { NET } from "../../lib/net/netConstants";
 import { generateRoomCode } from "./roomCode";
 import { Room, type RoomActionResult } from "./room";
 
