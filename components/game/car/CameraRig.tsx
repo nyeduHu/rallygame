@@ -6,13 +6,13 @@ import { useEffect, useRef } from "react";
 import { Euler, Quaternion, Vector3 } from "three";
 import { CAMERA } from "@/lib/game/constants";
 import type { MouseLook } from "@/lib/game/input/mouseLook";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
 import { useGameStore } from "@/lib/game/store";
 import { FRAME_PRIORITY } from "../scene/framePriority";
 
 interface CameraRigProps {
-  session: GameSession;
+  session: SessionView;
   mouseLook: MouseLook;
   role: Role;
   solo: boolean;

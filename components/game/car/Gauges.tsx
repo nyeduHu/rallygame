@@ -8,7 +8,7 @@ import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { DRIVETRAIN, UNITS } from "@/lib/game/constants";
 import { clamp } from "@/lib/game/math";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 
 const { CENTER, SPACING, RADIUS, RIM_WIDTH, NEEDLE_LENGTH, NEEDLE_WIDTH, SWEEP, START_ANGLE, SPEED_FULL_SCALE_KMH, TILT } =
   COCKPIT.GAUGES;
@@ -48,7 +48,7 @@ function Gauge({ x, needleRef }: GaugeProps) {
 }
 
 interface GaugesProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 /**

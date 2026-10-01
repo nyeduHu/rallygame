@@ -6,10 +6,10 @@ import { useEffect, useRef } from "react";
 import { Vector3, type DirectionalLight } from "three";
 import { RENDER } from "@/lib/game/constants";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 
 interface LightingProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 const SUN_OFFSET = new Vector3(RENDER.SUN_DIRECTION.x, RENDER.SUN_DIRECTION.y, RENDER.SUN_DIRECTION.z)

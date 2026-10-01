@@ -1,7 +1,7 @@
 // components/game/car/Cockpit.tsx
 "use client";
 
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
 import { CockpitShell } from "./CockpitShell";
 import { Gauges } from "./Gauges";
@@ -10,7 +10,7 @@ import { PassengerSide } from "./PassengerSide";
 import { SteeringWheel } from "./SteeringWheel";
 
 interface CockpitProps {
-  session: GameSession;
+  session: SessionView;
   activeRole: Role;
 }
 

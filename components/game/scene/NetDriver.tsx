@@ -47,7 +47,7 @@ export function NetDriver({ session }: NetDriverProps) {
       p: [p.x, p.y, p.z],
       q: [q.x, q.y, q.z, q.w],
       v: [v.x, v.y, v.z],
-      steer: 0,
+      steer: session.vehicle.steer,
       wheelSpin: 0,
       susp: ZERO_SUSPENSION,
     });

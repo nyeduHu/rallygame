@@ -17,6 +17,7 @@ import { StartOverlay } from "./overlays/StartOverlay";
 import { TuningPanel } from "./hud/TuningPanel";
 import { Crosshair } from "./hud/Crosshair";
 import { GameScene } from "./scene/GameScene";
+import { GameSession } from "@/lib/game/session";
 import { useGameSession } from "./useGameSession";
 
 interface RallyGameProps {
@@ -24,7 +25,7 @@ interface RallyGameProps {
   role: Role;
   solo: boolean;
   /** Online room race: the server owns start time and results; omit for the solo prototype. */
-  online?: { remoteTeamIds: string[] };
+  online?: { ownTeamId: string; remoteTeamIds: string[] };
 }
 
 const METRES_PER_KM = 1000;
@@ -38,7 +39,7 @@ const PIXEL_RATIO: [number, number] = [1, RENDER.MAX_PIXEL_RATIO];
  * @returns Canvas plus DOM overlays.
  */
 export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
-  const { session, road, terrain, error } = useGameSession(seed);
+  const { session, road, terrain, error } = useGameSession(seed, online !== undefined && role === "codriver");
   const keyboard = useMemo(() => new KeyboardControls(solo), [solo]);
   const mouseLook = useMemo(() => new MouseLook(), []);
   const interactionSystem = useMemo(() => new InteractionSystem(), []);
@@ -53,13 +54,13 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
     process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).get("tune") === "1";
 
   const handleStart = useCallback(() => {
-    if (!session) return;
+    if (!(session instanceof GameSession)) return;
     mouseLook.requestLock();
     session.beginCountdown();
   }, [session, mouseLook]);
 
   const handleRestart = useCallback(() => {
-    if (!session) return;
+    if (!(session instanceof GameSession)) return;
     session.restart();
     mouseLook.requestLock();
     session.beginCountdown();
@@ -84,7 +85,7 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
   }, [showTuningPanel]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!(session instanceof GameSession)) return;
     return keyboard.onAction((action) => {
       if (action === "resetToRoad") session.resetToRoad();
       if (action === "toggleView") useGameStore.getState().toggleView();

@@ -14,6 +14,10 @@ export const NET = {
   PING_SAMPLES: 8,
   ACK_TIMEOUT_MS: 5000,
   MAX_SPEED_MS: 70,
+  /** Speed at which the co-driver view shows redline revs (no rpm is networked). */
+  REMOTE_RPM_FULL_SPEED_MS: 45,
+  /** Forward speed below which the co-driver view shows reverse. */
+  REMOTE_REVERSE_SPEED_MS: -0.5,
   MAX_OFF_ROAD_METRES: 80,
   POSE_SLACK_METRES: 6,
   MAX_VIOLATIONS_PER_10S: 25,

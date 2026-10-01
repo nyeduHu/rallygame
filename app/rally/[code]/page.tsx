@@ -32,7 +32,7 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
     const remoteTeamIds = room.teams.filter((team) => team.id !== me.teamId && team.driver && team.codriver).map((team) => team.id);
     return (
       <main className="relative h-full w-full overflow-hidden">
-        <RallyGameLoader seed={room.seed} role={me.role} solo={false} online={{ remoteTeamIds }} />
+        <RallyGameLoader seed={room.seed} role={me.role} solo={false} online={{ ownTeamId: me.teamId ?? "", remoteTeamIds }} />
       </main>
     );
   }

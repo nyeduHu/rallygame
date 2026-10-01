@@ -15,7 +15,7 @@ interface RallyGameLoaderProps {
   seed: number;
   role: Role;
   solo: boolean;
-  online?: { remoteTeamIds: string[] };
+  online?: { ownTeamId: string; remoteTeamIds: string[] };
 }
 
 /**

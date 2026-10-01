@@ -4,7 +4,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import { useGameStore } from "@/lib/game/store";
 import { FRAME_PRIORITY } from "../scene/framePriority";
 import type { Role } from "@/lib/game/roles";
@@ -12,7 +12,7 @@ import { CarExterior } from "./CarExterior";
 import { Cockpit } from "./Cockpit";
 
 interface CarRigProps {
-  session: GameSession;
+  session: SessionView;
   role: Role;
   solo: boolean;
 }

@@ -8,10 +8,10 @@ import { Mesh, type Object3D } from "three";
 import { CAR_MODEL_SCALE, CAR_MODEL_WHEEL_RADIUS, CAR_WHEEL_NODE_NAMES, MODEL_PATHS } from "@/lib/game/assets";
 import { VEHICLE } from "@/lib/game/constants";
 import { restingRideHeight, staticCompression } from "@/lib/game/physics/vehicle";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 
 interface CarExteriorProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 /** Kenney wheel nodes are listed FL, FR, RL, RR to match Vehicle.wheels order. */

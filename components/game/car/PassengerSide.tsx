@@ -8,7 +8,7 @@ import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { INTERACTION } from "@/lib/game/constants";
 import type { InteractableSpec } from "@/lib/game/interaction/interactionSystem";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
 import { useGameStore } from "@/lib/game/store";
 import { Beam, beamTransform } from "./Beam";
@@ -18,7 +18,7 @@ import { Interactable } from "../interaction/Interactable";
 type Vec3 = readonly [number, number, number];
 
 interface PassengerSideProps {
-  session: GameSession;
+  session: SessionView;
   activeRole: Role;
 }
 
