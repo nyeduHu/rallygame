@@ -1,5 +1,6 @@
 // server/net/gateway.ts
 import type { Server, Socket } from "socket.io";
+import { dailySeed } from "../../lib/game/stage/dailySeed";
 import { NET } from "../../lib/net/netConstants";
 import { type ClientEventName, carImpactSchema, carInputsSchema, clientEventSchemas, footPoseSchema, poseReportSchema, refuelStepSchema, repairStepSchema, seatSetSchema } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
@@ -73,7 +74,7 @@ export function bindGateway(
         if (event === "room:create") {
           const name = String(data.name ?? "");
           const maxTeams = typeof data.maxTeams === "number" ? Math.min(data.maxTeams, NET.MAX_TEAMS_LIMIT) : undefined;
-          const room = roomManager.createRoom(name, { maxTeams });
+          const room = roomManager.createRoom(name, { maxTeams, seed: data.useDailySeed === true ? dailySeed(new Date()) : undefined });
           const host = room.players.get(room.hostId);
           if (!host) {
             return { ok: false, error: "not_found" };

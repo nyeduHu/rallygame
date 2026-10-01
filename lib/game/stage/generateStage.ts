@@ -1,7 +1,7 @@
 // lib/game/stage/generateStage.ts
-import { ROAD, VEHICLE } from "../constants";
+import { PROPS, ROAD, VEHICLE } from "../constants";
 import { createRng, deriveSeed } from "../random";
-import { gateHalfWidth, placeBarriers, placeCones, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
+import { clearAroundArcs, gateHalfWidth, placeBarriers, placeCones, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
 import { RoadIndex, poseAt } from "./roadIndex";
 import { generateRoadLayout, hasEnoughCorners, type RoadLayout } from "./roadLayout";
 import { validateCandidate } from "./validateStage";
@@ -116,9 +116,9 @@ export function generateStage(seed: number, stageIndex = 0): StageData {
     startS,
     finishS,
     checkpointS,
-    trees: clearPitArea(scatterTrees(contextFor(SALT.TREES)), pit),
-    rocks: clearPitArea(scatterRocks(contextFor(SALT.ROCKS)), pit),
-    grass: clearPitArea(scatterGrass(contextFor(SALT.GRASS)), pit),
+    trees: clearAroundArcs(clearPitArea(scatterTrees(contextFor(SALT.TREES)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
+    rocks: clearAroundArcs(clearPitArea(scatterRocks(contextFor(SALT.ROCKS)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
+    grass: clearAroundArcs(clearPitArea(scatterGrass(contextFor(SALT.GRASS)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
     barriers: clearPitArea(placeBarriers(contextFor(SALT.STRUCTURES), layout.corners), pit),
     cones: clearPitArea(placeCones(contextFor(SALT.STRUCTURES), layout.corners), pit),
     spawn: spawnPose,

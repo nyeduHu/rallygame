@@ -77,6 +77,8 @@ export class Vehicle {
   steer = 0;
   handbrake = false;
   forwardSpeed = 0;
+  /** Largest sideways tyre slip speed (m/s) this step, for the tyre sound. */
+  slipSpeed = 0;
 
   /** Pose before and after the most recent step, for render interpolation. */
   readonly previousPosition = new Vector3();
@@ -243,6 +245,7 @@ export class Vehicle {
     this.castWheels();
     const springForces = this.computeSpringForces(dt);
 
+    let slip = 0;
     for (let i = 0; i < WHEEL_COUNT; i++) {
       const wheel = this.wheels[i];
       wheel.steerAngle = wheel.isFront ? steerAngle : 0;
@@ -252,8 +255,9 @@ export class Vehicle {
         wheel.spinAngle += wheel.spinRate * dt;
         continue;
       }
-      this.applyWheelForces(i, springForces[i], output.driveForce, output.brake, dt);
+      slip = Math.max(slip, this.applyWheelForces(i, springForces[i], output.driveForce, output.brake, dt));
     }
+    this.slipSpeed = slip;
 
     // Quadratic aero drag at the centre of mass.
     s.impulse.copy(s.velocity).multiplyScalar(-VEHICLE.AERO_DRAG * speed * dt);
@@ -348,8 +352,9 @@ export class Vehicle {
    * @param driveForce - Total drivetrain force for the car.
    * @param brakePedal - Brake pedal 0..1.
    * @param dt - Step length.
+   * @returns Sideways slip speed of this wheel (m/s), used for the tyre sound.
    */
-  private applyWheelForces(i: number, springForce: number, driveForce: number, brakePedal: number, dt: number): void {
+  private applyWheelForces(i: number, springForce: number, driveForce: number, brakePedal: number, dt: number): number {
     const { VEHICLE, TIRE, DRIVETRAIN } = getActiveTuning();
     const s = this.scratch;
     const wheel = this.wheels[i];
@@ -417,6 +422,7 @@ export class Vehicle {
       ? 0
       : vLong / VEHICLE.WHEEL_RADIUS + (spinning ? Math.sign(driveForce) * TIRE.WHEELSPIN_VISUAL_GAIN : 0);
     wheel.spinAngle += wheel.spinRate * dt;
+    return Math.abs(vLat);
   }
 
   /** Records the post-step pose; call after world.step(). */

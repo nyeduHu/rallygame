@@ -17,6 +17,8 @@ import { Cones } from "./Cones";
 import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
+import { AudioDriver } from "./AudioDriver";
+import { DistancePosts } from "./DistancePosts";
 import { FuelPump } from "../pit/FuelPump";
 import { PitArea } from "../pit/PitArea";
 import { OnFootRig } from "../onfoot/OnFootRig";
@@ -88,6 +90,7 @@ export function GameScene({
       <GroundMesh mesh={road} name="road" />
       <StageProps stage={session.stage} />
       <Gates stage={session.stage} />
+      <DistancePosts stage={session.stage} />
       <Cones session={session} />
       <CarRig session={session} role={role} solo={solo} />
       <CameraRig session={session} mouseLook={mouseLook} role={role} solo={solo} />
@@ -113,6 +116,7 @@ export function GameScene({
       {online && <PlayerBodies ownTeamId={online.ownTeamId} ownRole={role} teamIds={[online.ownTeamId, ...online.remoteTeamIds]} />}
       <WeatherDriver session={session} ownTeamId={online?.ownTeamId} />
       <Rain />
+      <AudioDriver session={session} />
       <ReadySignal onReady={onReady} />
     </InteractionDriver>
   );

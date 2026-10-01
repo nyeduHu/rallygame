@@ -22,7 +22,7 @@ export function useRoom(resumeCode?: string): {
   room: RoomView | null;
   me: Me | null;
   connected: boolean;
-  createRoom: (name: string, maxTeams?: number) => Promise<CreateResult | null>;
+  createRoom: (name: string, maxTeams?: number, useDailySeed?: boolean) => Promise<CreateResult | null>;
   joinRoom: (roomCode: string, name: string) => Promise<RoomView | null>;
   setReady: (ready: boolean) => Promise<boolean>;
   startRace: () => Promise<boolean>;
@@ -107,8 +107,8 @@ export function useRoom(resumeCode?: string): {
     return player ? { id: player.id, name: player.name, role: player.role, teamId: player.teamId } : null;
   }, [room, playerId]);
 
-  const createRoom = useCallback(async (name: string, maxTeams: number = NET.MAX_TEAMS_DEFAULT) => {
-    const response = await rallyClient.request<CreateResult>("room:create", { name, maxTeams });
+  const createRoom = useCallback(async (name: string, maxTeams: number = NET.MAX_TEAMS_DEFAULT, useDailySeed = false) => {
+    const response = await rallyClient.request<CreateResult>("room:create", { name, maxTeams, useDailySeed });
     if (!response.ok || !response.roomCode) return null;
     rallyClient.rememberSession(response.roomCode, response.playerId ?? "", response.resumeToken ?? "");
     setPlayerId(response.playerId ?? null);

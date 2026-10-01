@@ -111,6 +111,8 @@ export const TERRAIN = {
 
 /** Prop scattering. */
 export const PROPS = {
+  /** Props are removed within this radius of the start and finish lines. */
+  MIN_CLEAR_RADIUS_START: 30,
   TREE_GRID: 7.5,
   TREE_JITTER: 0.85,
   TREE_FILL_CHANCE: 0.7,
@@ -161,6 +163,8 @@ export const GATES = {
   TOWER_OFFSET: 4.7,
   /** Half extents of bannerTowerGreen after height normalisation to TOWER_HEIGHT. */
   TOWER_HALF_EXTENTS: { x: 0.93, y: 3, z: 0.93 },
+  /** Gates ignore fog so they stay visible from this far. */
+  VISIBLE_DISTANCE_M: 900,
   /** Lateral tolerance for a checkpoint crossing to count. */
   DETECTION_HALF_WIDTH: 12,
   /** Progress beyond a gate by this much without crossing it counts as a missed gate. */
@@ -636,4 +640,52 @@ export const DIFFICULTY = {
   ],
   /** Stage 0 never has two hairpins closer than this along the road. */
   STAGE0_HAIRPIN_SPACING: 300,
+} as const;
+
+/** Roadside distance posts (non-solid). */
+export const POSTS = {
+  SPACING_M: 500,
+  SIZE: [0.25, 1.4, 0.25] as const,
+  PLATE_SIZE: [0.9, 0.5] as const,
+  /** Distance beyond the shoulder edge. */
+  OFFSET: 1.2,
+  TEXTURE_PX: 128,
+  PLATE_COLOR: "#f6f3ea",
+  TEXT_COLOR: "#1c1d21",
+  POST_COLOR: "#7d828c",
+} as const;
+
+/** Procedural audio (Web Audio only; no sample assets). */
+export const ENGINE_SOUND = {
+  BASE_HZ: 38,
+  HZ_PER_RPM: 0.03,
+  SQUARE_DETUNE_CENTS: 12,
+  SQUARE_GAIN: 0.35,
+  LOWPASS_BASE_HZ: 380,
+  LOWPASS_PER_RPM_HZ: 0.12,
+  IDLE_GAIN: 0.12,
+  THROTTLE_GAIN: 0.2,
+  RUMBLE_GAIN: 0.06,
+  RUMBLE_LOWPASS_HZ: 180,
+  /** Gain smoothing time constant (s) so changes never click. */
+  SMOOTHING_S: 0.05,
+  GRAVEL_FULL_SLIP_MS: 6,
+  GRAVEL_MAX_GAIN: 0.22,
+  GRAVEL_BAND_HZ: 1400,
+  GRAVEL_ROLL_GAIN: 0.05,
+  GRASS_FACTOR: 0.6,
+  THUD_GAIN: 0.5,
+  THUD_SECONDS: 0.25,
+  THUD_FULL_IMPULSE: 20000,
+  BEEP_HZ: 880,
+  BEEP_SECONDS: 0.12,
+  BEEP_GAP_SECONDS: 0.2,
+  BEEP_GAIN: 0.12,
+  BUZZ_HZ: 160,
+  BUZZ_SECONDS: 1.2,
+  RAIN_GAIN: 0.18,
+  RAIN_LOWPASS_HZ: 1800,
+  WIPER_THUNK_GAIN: 0.2,
+  MASTER_GAIN: 0.8,
+  STORAGE_KEY: "rally-muted",
 } as const;

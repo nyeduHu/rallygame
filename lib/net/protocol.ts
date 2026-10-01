@@ -57,6 +57,7 @@ export type RoomView = z.infer<typeof roomViewSchema>;
 export const roomCreateSchema = z.object({
   name: playerNameSchema,
   maxTeams: z.number().int().min(1).max(NET.MAX_TEAMS_LIMIT).optional(),
+  useDailySeed: z.boolean().optional(),
 }).strict();
 export type RoomCreatePayload = z.infer<typeof roomCreateSchema>;
 

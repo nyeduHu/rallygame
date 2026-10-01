@@ -24,6 +24,7 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
   const { room, me, connected, createRoom, joinRoom, setReady, startRace, createTeam, joinTeam } = useRoom(code);
   const results = useNetStore((state) => state.results);
   const [name, setName] = useState("");
+  const [daily, setDaily] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isHost = room !== null && me !== null && room.hostId === me.id;
@@ -55,7 +56,7 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
               event.preventDefault();
               setError(null);
               const action = code === NEW_ROOM_SLUG
-                ? createRoom(name).then((result) => {
+                ? createRoom(name, undefined, daily).then((result) => {
                     if (result?.roomCode) window.history.replaceState(null, "", `/rally/${result.roomCode}`);
                     return result !== null;
                   })
@@ -74,6 +75,12 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
                 className="rounded border border-slate-600 bg-slate-950 px-3 py-2"
               />
             </label>
+            {code === NEW_ROOM_SLUG && (
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={daily} onChange={(event) => setDaily(event.target.checked)} />
+                <span>Use today&apos;s daily stage</span>
+              </label>
+            )}
             <button type="submit" disabled={!connected} className="rounded bg-emerald-500 px-4 py-3 font-medium text-slate-950 disabled:opacity-50">
               {code === NEW_ROOM_SLUG ? "CREATE RALLY" : "JOIN RALLY"}
             </button>
