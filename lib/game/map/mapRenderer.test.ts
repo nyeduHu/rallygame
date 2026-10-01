@@ -60,11 +60,19 @@ describe("map geometry", () => {
     expect(projected.y).toBeLessThan(carMarkerY);
     expect(projected.y).toBeCloseTo(carMarkerY - 600 * 0.5);
     expect(projected.heading).toBeCloseTo(0);
-    expect(mapHeadingToCanvasAngle(projected.heading)).toBeCloseTo(-Math.PI / 2);
+    expect(mapHeadingToCanvasAngle(projected.heading)).toBeCloseTo(0);
   });
 
   it("rotates projected road headings into the canvas frame", () => {
-    expect(mapHeadingToCanvasAngle(0)).toBeCloseTo(-Math.PI / 2);
-    expect(mapHeadingToCanvasAngle(Math.PI / 2)).toBeCloseTo(0);
+    expect(mapHeadingToCanvasAngle(0)).toBeCloseTo(0);
+    // Heading increases to the left, so a quarter turn left points the marker left (counter-clockwise).
+    expect(mapHeadingToCanvasAngle(Math.PI / 2)).toBeCloseTo(-Math.PI / 2);
+  });
+
+  it("draws things on the car's left on the left of the NEXT map", () => {
+    const car: MapWorldPoint = { x: 0, z: 0, s: 0, heading: 0 };
+    // At heading 0 the car faces +z, so +x is on its left.
+    const left = projectNextPoint({ x: 10, z: 10, s: 0, heading: 0 }, car, { width: 600, height: 400 }, 1, 0.72);
+    expect(left.x).toBeLessThan(300);
   });
 });

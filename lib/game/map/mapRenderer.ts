@@ -21,12 +21,14 @@ export interface MapWorldPoint {
 }
 
 /**
- * Converts a world-relative road heading to a clockwise canvas rotation.
+ * Converts a road heading to a clockwise canvas rotation. World heading increases to the left
+ * while the map is drawn as seen from the driver's seat (left of travel is left on screen), so
+ * the canvas rotation is the negated heading.
  * @param heading - Road heading in world coordinates or relative to the map frame.
- * @returns Rotation that points the marker along the road on the canvas.
+ * @returns Rotation (clockwise, 0 = up) that points the marker along the road on the canvas.
  */
 export function mapHeadingToCanvasAngle(heading: number): number {
-  return Math.atan2(-Math.cos(heading), Math.sin(heading));
+  return -heading;
 }
 
 /**
@@ -57,7 +59,8 @@ export function fitRoadToViewport(
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerZ = (bounds.minZ + bounds.maxZ) / 2;
   return samples.map((sample) => ({
-    x: viewport.width / 2 + (sample.x - centerX) * scale,
+    // +x is the left of a car facing +z, so it goes to the left of the screen.
+    x: viewport.width / 2 - (sample.x - centerX) * scale,
     y: viewport.height / 2 - (sample.z - centerZ) * scale,
     s: sample.s,
     heading: sample.heading,
@@ -85,7 +88,8 @@ export function projectNextPoint(
   const forward = dx * Math.sin(car.heading) + dz * Math.cos(car.heading);
   const lateral = dx * Math.cos(car.heading) - dz * Math.sin(car.heading);
   return {
-    x: viewport.width / 2 + lateral * pixelsPerMetre,
+    // Lateral is positive to the left of travel, which is the left of the screen.
+    x: viewport.width / 2 - lateral * pixelsPerMetre,
     y: viewport.height * carVerticalRatio - forward * pixelsPerMetre,
     s: point.s,
     heading: point.heading - car.heading,

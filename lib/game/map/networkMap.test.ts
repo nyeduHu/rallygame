@@ -49,6 +49,8 @@ describe("network map fog of war", () => {
     const a = fitPoint(fit, 0, 0, 0, 0);
     const b = fitPoint(fit, 0, 1000, 1000, 0);
     expect(b.y).toBeLessThan(a.y);
+    // +x is the car's left when facing +z, so it maps to the left of the screen.
+    expect(fitPoint(fit, 50, 0, 0, 0).x).toBeLessThan(a.x);
     const direction = finishDirection({ x: 0, z: 0 }, { x: 0, z: 500 });
     expect(direction.distance).toBe(500);
     expect(direction.far.x).toBeCloseTo(0);

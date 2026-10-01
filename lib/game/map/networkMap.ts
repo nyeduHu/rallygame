@@ -140,7 +140,7 @@ export function computeFit(paths: ReadonlyArray<MapPath>, viewport: MapViewport,
 }
 
 /**
- * Maps a world point through a fit (north up: +z is up the screen).
+ * Maps a world point through a fit (+z is up the screen, +x is to the left, as seen from the driver's seat).
  * @param fit - Fit parameters.
  * @param x - World x.
  * @param z - World z.
@@ -149,7 +149,7 @@ export function computeFit(paths: ReadonlyArray<MapPath>, viewport: MapViewport,
  * @returns Canvas point.
  */
 export function fitPoint(fit: MapFit, x: number, z: number, s: number, heading: number): MapPoint {
-  return { x: fit.width / 2 + (x - fit.centerX) * fit.scale, y: fit.height / 2 - (z - fit.centerZ) * fit.scale, s, heading };
+  return { x: fit.width / 2 - (x - fit.centerX) * fit.scale, y: fit.height / 2 - (z - fit.centerZ) * fit.scale, s, heading };
 }
 
 /**
