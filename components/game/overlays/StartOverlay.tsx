@@ -1,6 +1,7 @@
 // components/game/overlays/StartOverlay.tsx
 "use client";
 
+import Link from "next/link";
 import { HudButton } from "@/components/ui/HudButton";
 import { ControlsList } from "./ControlsList";
 
@@ -36,6 +37,9 @@ export function StartOverlay({ seed, stageLengthKm, onStart }: StartOverlayProps
         <HudButton className="mt-6 w-full" onClick={onStart} autoFocus>
           Start stage
         </HudButton>
+        <Link href="/rally" className="mt-3 block text-center text-sm text-hud-accent underline">
+          Play online with a friend (create or join a lobby)
+        </Link>
       </section>
     </div>
   );

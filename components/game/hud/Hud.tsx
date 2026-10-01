@@ -60,16 +60,16 @@ function PointerHint() {
 export function Hud() {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-3 text-hud-text md:p-5">
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-2">
         <StageTimer />
+        <PitBanner />
       </div>
       <div className="flex flex-col items-center gap-3">
         <Countdown />
-        <PitBanner />
-        <PointerHint />
       </div>
-      <div className="flex items-end justify-between">
+      <div className="flex items-end justify-between gap-3">
         <MechanicsBars />
+        <PointerHint />
         <Speedometer />
       </div>
     </div>
