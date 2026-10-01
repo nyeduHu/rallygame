@@ -30,6 +30,8 @@ export const SEED = {
   WEATHER_SALT: 0x57ea7e5,
   /** Salt for the seeded part-failure stream. */
   FAILURES_SALT: 0xfa11ed,
+  /** Salt for pit placement (reserved: placement is deterministic from the road, not random). */
+  PIT_SALT: 0x91750,
 } as const;
 
 /** Road layout and validation. */
@@ -566,4 +568,40 @@ export const REPAIR = {
   /** Hood opens to this angle (radians). */
   HOOD_OPEN_ANGLE: 1.05,
   HOOD_DAMPING: 8,
+} as const;
+
+/** Pit stop placement and flow (spec 7, 8). */
+export const PIT = {
+  /** Allowed band of the stage (fractions of stage length). */
+  BAND_START: 0.45,
+  BAND_END: 0.65,
+  MIN_STRAIGHT_METRES: 120,
+  MIN_CLEARANCE_FROM_CORNER_M: 60,
+  /** Fallback when no straight gives the full clearance: the longest gap, but never closer than this. */
+  FALLBACK_CLEARANCE_M: 15,
+  /** Box dimensions: x across the road, z along it. */
+  BOX_SIZE: { x: 7, z: 14 },
+  /** Gap between the road shoulder edge and the box. */
+  BOX_GAP: 0.5,
+  /** Pump distance beyond the outer edge of the box. */
+  PUMP_OFFSET: 1.6,
+  /** Props within this margin of the box (and pump) are removed. */
+  CLEAR_MARGIN: 3,
+  MAX_ENTRY_SPEED_MS: 2,
+  MIN_FUEL_TO_RELEASE: 0.9,
+} as const;
+
+/** Refuelling hardware (co-driver, spec 7). */
+export const REFUEL = {
+  HOSE_LENGTH_M: 8,
+  LITRES_PER_SECOND: 2.5,
+  /** Litres a full tank holds (equal to MECHANICS.TANK_CAPACITY_UNITS). */
+  TANK_LITRES: 100,
+  OVERFLOW_AT: 1,
+  TANGLE_PENALTY_S: 4,
+  SPILL_PENALTY_S: 3,
+  /** Co-driver must be within this distance of the car flap or pump to act. */
+  MAX_DISTANCE_M: 3,
+  /** Fuel flap position on the car (car-local: right/passenger side rear). */
+  FLAP_LOCAL: [-1.0, 0.45, -1.3] as readonly [number, number, number],
 } as const;

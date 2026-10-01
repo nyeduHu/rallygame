@@ -28,5 +28,6 @@ export const NET = {
     "foot:pose": 30,
     "seat:set": 5,
     "repair:step": 10,
+    "refuel:step": 10,
   },
 } as const;

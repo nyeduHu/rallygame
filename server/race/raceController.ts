@@ -1,5 +1,8 @@
 // server/race/raceController.ts
 import { DRIVETRAIN, ON_FOOT, VEHICLE } from "../../lib/game/constants";
+import { applyRefuelStep, initialRefuel, stepRefuel, tangle, type RefuelState } from "../../lib/game/refuel/refuelMachine";
+import { isInsidePitBox } from "../../lib/game/stage/pitStop";
+import { PIT, REFUEL } from "../../lib/game/constants";
 import { applyStep, settle, type RepairState } from "../../lib/game/repair/repairMachine";
 import { REPAIR } from "../../lib/game/constants";
 import { canExit, canReenter, doorPosition } from "../../lib/game/onfoot/onFootController";
@@ -8,7 +11,7 @@ import { generateStage } from "../../lib/game/stage/generateStage";
 import { RoadIndex } from "../../lib/game/stage/roadIndex";
 import type { StageData } from "../../lib/game/stage/types";
 import { NET } from "../../lib/net/netConstants";
-import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, RepairStepPayload, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
+import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, RefuelStepPayload, RepairStepPayload, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
 import { initialMechanics, stepMechanics, applyCrash, type BrokenPart, type MechanicalState } from "../../lib/game/vehicle/mechanics";
 import { MECHANICS } from "../../lib/game/constants";
@@ -53,6 +56,12 @@ interface TeamRaceState {
   /** Server time the current repair started, and total time spent repairing. */
   repairStartedMs: number | null;
   repairDurationMs: number;
+  refuel: RefuelState;
+  /** Pit accounting (D9): time spent in the pit box is excluded from raw time. */
+  pitStartMs: number | null;
+  pitMs: number;
+  spilled: boolean;
+  pitReady: boolean;
 }
 
 /**
@@ -64,6 +73,9 @@ function headingOf(pose: PoseReport): number {
   const [x, y, z, w] = pose.q;
   return Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
 }
+
+/** Off-road time inside or near the pit box is not a navigation mistake. */
+const PIT_NAV_MARGIN_M = 12;
 
 const NEUTRAL_POSE: Pick<PoseReport, "p" | "q" | "v" | "steer" | "wheelSpin" | "seq"> = {
   p: [0, 0, 0],
@@ -121,6 +133,11 @@ export class RaceController {
         repair: { kind: "idle" },
         repairStartedMs: null,
         repairDurationMs: 0,
+        refuel: initialRefuel(),
+        pitStartMs: null,
+        pitMs: 0,
+        spilled: false,
+        pitReady: false,
       });
     }
   }
@@ -196,7 +213,7 @@ export class RaceController {
    */
   repairStep(teamId: string, role: Role, request: RepairStepPayload): string | null {
     const team = this.teams.get(teamId);
-    if (!team || role !== "driver" || team.status !== "racing") return "not_allowed";
+    if (!team || role !== "driver" || (team.status !== "racing" && team.status !== "pit")) return "not_allowed";
     const car = team.lastPose?.report;
     const foot = team.foot.driver?.report;
     if (request.step === "IGNITION") {
@@ -244,6 +261,37 @@ export class RaceController {
     if (team) team.mech = { ...team.mech, engineStatus: "failed", brokenPart: part };
   }
 
+  /**
+   * Sets a team's fuel level (scripted tests and debugging).
+   * @param teamId - Team.
+   * @param fuel01 - New fuel fraction.
+   */
+  setFuel(teamId: string, fuel01: number): void {
+    const team = this.teams.get(teamId);
+    if (team) team.mech = { ...team.mech, fuel01 };
+  }
+
+  /** @returns The last accepted car position for a team (tests and tools). */
+  lastCarPosition(teamId: string): { x: number; z: number } | null {
+    const report = this.teams.get(teamId)?.lastPose?.report;
+    return report ? { x: report.p[0], z: report.p[2] } : null;
+  }
+
+  /** @returns A player's last accepted on-foot position (tests and tools). */
+  footPosition(teamId: string, role: Role): { x: number; z: number } | null {
+    const report = this.teams.get(teamId)?.foot[role]?.report;
+    return report ? { x: report.p[0], z: report.p[2] } : null;
+  }
+
+  /** @returns World position of the team's fuel flap (tests and tools). */
+  flapPosition(teamId: string): { x: number; z: number } | null {
+    const car = this.teams.get(teamId)?.lastPose?.report;
+    if (!car) return null;
+    const yaw = headingOf(car);
+    const [lx, , lz] = REFUEL.FLAP_LOCAL;
+    return { x: car.p[0] + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: car.p[2] - lx * Math.sin(yaw) + lz * Math.cos(yaw) };
+  }
+
   /** Records the elapsed repair time and clears the start marker. */
   private finishRepair(team: TeamRaceState, nowMs: number): void {
     if (team.repairStartedMs !== null) team.repairDurationMs += nowMs - team.repairStartedMs;
@@ -269,7 +317,7 @@ export class RaceController {
   reportPose(teamId: string, report: PoseReport): boolean {
     const team = this.teams.get(teamId);
     const nowMs = this.now();
-    if (!team || team.status !== "racing" || nowMs < this.goAtMs) return false;
+    if (!team || (team.status !== "racing" && team.status !== "pit") || nowMs < this.goAtMs) return false;
     const projection = this.index.nearest(report.p[0], report.p[2], NET.MAX_OFF_ROAD_METRES);
     const reason = validatePose(report, team.lastPose, nowMs, projection ? Math.abs(projection.lateral) : null);
     if (reason || !projection) {
@@ -282,6 +330,7 @@ export class RaceController {
     const wasReset = team.lastPose !== null && report.epoch > team.lastPose.report.epoch;
     team.lastLateral = projection.lateral;
     team.lastPose = { report, atMs: nowMs };
+    this.updatePit(team, report, nowMs);
     // A reset teleports the car; re-anchor progress so the jump guard in stepCheckpoints does not freeze it.
     if (wasReset) team.progress = { ...team.progress, progressS: projection.s };
     const step = stepCheckpoints(team.progress, projection.s, projection.lateral, this.stage.checkpointS, this.stage.finishS);
@@ -310,7 +359,7 @@ export class RaceController {
   /** Marks a team DNF (for example the driver left) and emits the event. */
   markDnf(teamId: string, reason: string): void {
     const team = this.teams.get(teamId);
-    if (!team || team.status !== "racing") return;
+    if (!team || (team.status !== "racing" && team.status !== "pit")) return;
     team.status = "dnf";
     this.sink.event({ teamId, kind: "dnf", atServerMs: this.now(), data: { reason } });
   }
@@ -323,7 +372,10 @@ export class RaceController {
     this.dnfAbsentDrivers(nowMs);
     const dt = Math.max(0, (nowMs - this.lastTickMs) / 1000);
     this.lastTickMs = nowMs;
-    for (const team of this.teams.values()) if (team.status === "racing") this.stepTeam(team, dt, nowMs);
+    for (const team of this.teams.values()) {
+      if (team.status === "racing") this.stepTeam(team, dt, nowMs);
+      else if (team.status === "pit") this.stepPit(team, dt, nowMs);
+    }
     this.sink.snapshot({
       serverNowMs: nowMs,
       raceElapsedMs: nowMs - this.goAtMs,
@@ -331,7 +383,7 @@ export class RaceController {
       teams: [...this.teams.values()].map((team) => this.teamSnapshot(team)),
       onFoot: this.onFootViews(),
     });
-    if ([...this.teams.values()].every((team) => team.status !== "racing")) this.complete();
+    if ([...this.teams.values()].every((team) => team.status === "finished" || team.status === "dnf")) this.complete();
   }
 
   /**
@@ -351,7 +403,7 @@ export class RaceController {
    */
   reportImpact(teamId: string, impact: CarImpact): void {
     const team = this.teams.get(teamId);
-    if (!team || team.status !== "racing") return;
+    if (!team || (team.status !== "racing" && team.status !== "pit")) return;
     const impulse = Math.min(impact.impulse, PENALTY.MAX_IMPACT_IMPULSE);
     if (impact.kind === "cone") {
       team.ledger.addObjectHit(impact.objectId ?? -1);
@@ -384,7 +436,8 @@ export class RaceController {
       dt,
     });
     team.pendingImpulse = 0;
-    team.ledger.trackOffRoad(team.lastLateral, team.progress.progressS, this.stage.corners, dt, nowMs);
+    const nearPit = this.stage.pit && team.lastPose && isInsidePitBox(this.stage.pit, team.lastPose.report.p[0], team.lastPose.report.p[2], PIT_NAV_MARGIN_M);
+    if (!nearPit) team.ledger.trackOffRoad(team.lastLateral, team.progress.progressS, this.stage.corners, dt, nowMs);
 
     if (team.mech.engineStatus === "failed") team.failedAtMs ??= nowMs;
     else team.failedAtMs = null;
@@ -394,10 +447,98 @@ export class RaceController {
     }
   }
 
+  /**
+   * Moves a team into or out of the pit box and keeps the pit clock (D9).
+   * @param team - Team state.
+   * @param report - Latest accepted pose.
+   * @param nowMs - Server time.
+   */
+  private updatePit(team: TeamRaceState, report: PoseReport, nowMs: number): void {
+    const pit = this.stage.pit;
+    if (!pit) return;
+    const inside = isInsidePitBox(pit, report.p[0], report.p[2]);
+    const speed = Math.hypot(...report.v);
+    if (team.status === "racing" && inside && speed < PIT.MAX_ENTRY_SPEED_MS) {
+      team.status = "pit";
+      team.pitStartMs = nowMs;
+      team.pitReady = false;
+      this.sink.event({ teamId: team.teamId, kind: "pit_enter", atServerMs: nowMs });
+    } else if (team.status === "pit" && !inside) {
+      team.pitMs += nowMs - (team.pitStartMs ?? nowMs);
+      team.pitStartMs = null;
+      team.status = "racing";
+      team.refuel = initialRefuel();
+      team.pitReady = false;
+      this.sink.event({ teamId: team.teamId, kind: "pit_exit", atServerMs: nowMs, data: { pitMs: team.pitMs } });
+    }
+  }
+
+  /**
+   * Applies a co-driver refuelling step: on foot, near the pump (hose, pump lever) or the car flap.
+   * @param teamId - Team.
+   * @param role - Player's role (only the co-driver refuels).
+   * @param request - Requested step.
+   * @returns Null when accepted, otherwise an error code.
+   */
+  refuelStep(teamId: string, role: Role, request: RefuelStepPayload): string | null {
+    const team = this.teams.get(teamId);
+    const pit = this.stage.pit;
+    const car = team?.lastPose?.report;
+    const foot = team?.foot.codriver?.report;
+    if (!team || !pit || role !== "codriver" || team.status !== "pit" || !car) return "not_allowed";
+    if (team.occupancy.codriver !== "foot" || !foot) return "not_on_foot";
+    const yaw = headingOf(car);
+    const [lx, , lz] = REFUEL.FLAP_LOCAL;
+    const flap = { x: car.p[0] + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: car.p[2] - lx * Math.sin(yaw) + lz * Math.cos(yaw) };
+    const nearFlap = Math.hypot(foot.p[0] - flap.x, foot.p[2] - flap.z) <= REFUEL.MAX_DISTANCE_M;
+    const nearPump = Math.hypot(foot.p[0] - pit.pump.x, foot.p[2] - pit.pump.z) <= REFUEL.MAX_DISTANCE_M;
+    const atFlap = request.step === "OPEN_FLAP" || request.step === "CLOSE_FLAP" || request.step === "CONNECT" || request.step === "DISCONNECT";
+    if (atFlap ? !nearFlap : !nearPump) return "too_far";
+    const result = applyRefuelStep(team.refuel, request.step);
+    if (!result.ok) return result.error;
+    team.refuel = result.state;
+    return null;
+  }
+
+  /**
+   * Integrates fuel while the pump runs, snaps tangled hoses, penalises spills, and announces
+   * when the team may leave.
+   * @param team - Team state.
+   * @param dt - Seconds since the last tick.
+   * @param nowMs - Server time.
+   */
+  private stepPit(team: TeamRaceState, dt: number, nowMs: number): void {
+    const pit = this.stage.pit;
+    if (!pit) return;
+    const foot = team.foot.codriver?.report;
+    if (foot && team.refuel.kind === "hose_held") {
+      const result = tangle(team.refuel, Math.hypot(foot.p[0] - pit.pump.x, foot.p[2] - pit.pump.z));
+      if (result.tangled) {
+        team.refuel = result.state;
+        team.ledger.addPenaltySeconds(REFUEL.TANGLE_PENALTY_S);
+      }
+    }
+    const filled = stepRefuel(team.refuel, team.mech.fuel01, dt);
+    team.mech = { ...team.mech, fuel01: filled.fuel01 };
+    if (filled.overflowed && !team.spilled) {
+      team.spilled = true;
+      team.ledger.addPenaltySeconds(REFUEL.SPILL_PENALTY_S);
+    }
+    const ready =
+      team.mech.fuel01 >= PIT.MIN_FUEL_TO_RELEASE &&
+      team.mech.engineStatus !== "failed" &&
+      !team.hoodOpen &&
+      team.occupancy.driver === "seat" &&
+      team.occupancy.codriver === "seat" &&
+      team.refuel.kind === "idle";
+    if (ready && !team.pitReady) this.sink.event({ teamId: team.teamId, kind: "pit_release", atServerMs: nowMs });
+    team.pitReady = ready;
+  }
+
   /** Marks teams DNF when their driver has been gone longer than the reconnect grace period. */
   private dnfAbsentDrivers(nowMs: number): void {
     for (const team of this.teams.values()) {
-      if (team.status !== "racing") continue;
+      if (team.status !== "racing" && team.status !== "pit") continue;
       const driverId = this.room.teams.get(team.teamId)?.driverId;
       const driver = driverId ? this.room.players.get(driverId) : undefined;
       const goneSince = driver && !driver.connected ? driver.disconnectedAtMs : null;
@@ -446,6 +587,8 @@ export class RaceController {
       occupancy: team.occupancy,
       repair: "part" in team.repair ? { kind: team.repair.kind, part: team.repair.part } : { kind: team.repair.kind },
       hoodOpen: team.hoodOpen,
+      refuel: team.refuel,
+      pitReady: team.pitReady,
     };
   }
 
@@ -454,15 +597,15 @@ export class RaceController {
     this.done = true;
     const span = this.stage.finishS - this.stage.startS;
     const entries: TeamResult[] = [...this.teams.values()].map((team) => {
-      const rawMs = team.finishedAtMs === null ? 0 : team.finishedAtMs - this.goAtMs;
+      const rawMs = team.finishedAtMs === null ? 0 : team.finishedAtMs - this.goAtMs - team.pitMs;
       return {
         teamId: team.teamId,
         name: team.name,
         status: team.status === "finished" ? "finished" : "dnf",
         rawMs,
         penaltyMs: team.ledger.penaltyMs,
-        pitMs: 0,
-        totalMs: team.status === "finished" ? computeTotalMs(rawMs, team.ledger.penaltyMs, 0) : (1 - (team.progress.progressS - this.stage.startS) / span) * 1e9,
+        pitMs: team.pitMs,
+        totalMs: team.status === "finished" ? computeTotalMs(rawMs, team.ledger.penaltyMs, team.pitMs) : (1 - (team.progress.progressS - this.stage.startS) / span) * 1e9,
         damage01: team.mech.damage01,
         fuel01: team.mech.fuel01,
         navErrors: team.ledger.navErrors,

@@ -58,6 +58,10 @@ export function RemoteDriver({ session, teamId }: RemoteDriverProps) {
       store.setMech(mechanicsFromSnapshot(team, store.mech));
       const repair = repairStateFromView(team.repair);
       if (repair) store.setRepair(repair);
+      if (team.refuel) store.setRefuel(team.refuel);
+      const pitActive = team.status === "pit";
+      const pitReady = team.pitReady === true;
+      if (pitActive !== store.pitActive || pitReady !== store.pitReady) store.setPit({ pitActive, pitReady });
       if (team.hoodOpen !== undefined) store.setHoodOpen(team.hoodOpen);
     }
     useGameStore.getState().setTelemetry({

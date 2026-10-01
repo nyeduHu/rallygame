@@ -81,6 +81,20 @@ export interface RoadPose {
 }
 
 /** Everything needed to render and simulate a stage; pure data, no engine types. */
+/** Pit box beside the road with a fuel pump on its outer side. */
+export interface PitInfo {
+  /** Arc length of the box centre. */
+  s: number;
+  x: number;
+  y: number;
+  z: number;
+  /** Road heading at the box (box is aligned with the road). */
+  heading: number;
+  halfLength: number;
+  halfWidth: number;
+  pump: { x: number; z: number };
+}
+
 export interface StageData {
   seed: number;
   /** Generation attempt that passed validation; useful when debugging a seed. */
@@ -98,4 +112,6 @@ export interface StageData {
   barriers: PropPlacement[];
   cones: PropPlacement[];
   spawn: RoadPose;
+  /** Pit box, or null when the road has no suitable straight. */
+  pit: PitInfo | null;
 }

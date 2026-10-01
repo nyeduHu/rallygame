@@ -4,6 +4,7 @@ import type { RaceSnapshot } from "./race/raceTracker";
 import type { SurfaceKind } from "./stage/types";
 import type { Role } from "./roles";
 import type { Vector3 } from "three";
+import { initialRefuel, type RefuelState } from "./refuel/refuelMachine";
 import type { RepairState } from "./repair/repairMachine";
 import { initialMechanics, type BrokenPart, type MechanicalState } from "./vehicle/mechanics";
 import type { WeatherState } from "./weather/weather";
@@ -31,6 +32,13 @@ interface GameStore {
   mech: MechanicalState;
   /** Role currently standing outside the car on this client, or null when seated. */
   footRole: Role | null;
+  refuel: RefuelState;
+  setRefuel: (refuel: RefuelState) => void;
+  /** True while the team is stopped in the pit box. */
+  pitActive: boolean;
+  /** True once the server says the team may leave the pit. */
+  pitReady: boolean;
+  setPit: (pit: { pitActive: boolean; pitReady: boolean }) => void;
   repair: RepairState;
   setRepair: (repair: RepairState) => void;
   /** Debug: `&fail=drive_belt` breaks that part when the stage starts (solo). */
@@ -94,6 +102,11 @@ export const useGameStore = create<GameStore>()((set) => ({
   placeholderCubeOn: false,
   mech: initialMechanics(),
   footRole: null,
+  refuel: initialRefuel(),
+  setRefuel: (refuel) => set({ refuel }),
+  pitActive: false,
+  pitReady: false,
+  setPit: (pit) => set(pit),
   repair: { kind: "idle" },
   setRepair: (repair) => set({ repair }),
   failPart: null,

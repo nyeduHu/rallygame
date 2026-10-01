@@ -25,6 +25,21 @@ function Countdown() {
 }
 
 /**
+ * Pit stop banner: what is still missing, then GO.
+ * @returns Banner or nothing.
+ */
+function PitBanner() {
+  const pitActive = useGameStore((state) => state.pitActive);
+  const pitReady = useGameStore((state) => state.pitReady);
+  if (!pitActive) return null;
+  return (
+    <p aria-live="polite" className="rounded-md bg-hud-surface px-4 py-2 font-mono text-lg font-bold">
+      {pitReady ? <span className="text-hud-success">GO!</span> : <span className="text-hud-accent">PIT STOP</span>}
+    </p>
+  );
+}
+
+/**
  * Reminder shown while driving without mouse capture.
  * @returns Hint or nothing.
  */
@@ -50,6 +65,7 @@ export function Hud() {
       </div>
       <div className="flex flex-col items-center gap-3">
         <Countdown />
+        <PitBanner />
         <PointerHint />
       </div>
       <div className="flex items-end justify-between">

@@ -3,9 +3,11 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
-import { DRIVETRAIN, MECHANICS, SIMULATION } from "@/lib/game/constants";
+import { DRIVETRAIN, MECHANICS, PIT, SIMULATION } from "@/lib/game/constants";
 import { gameEvents } from "@/lib/game/events";
 import type { GameSession } from "@/lib/game/session";
+import { initialRefuel, stepRefuel } from "@/lib/game/refuel/refuelMachine";
+import { isInsidePitBox } from "@/lib/game/stage/pitStop";
 import { mechRuntime } from "@/lib/game/mechRuntime";
 import { repairStateFromView } from "@/lib/game/repair/repairMachine";
 import { useGameStore } from "@/lib/game/store";
@@ -43,6 +45,10 @@ export function MechanicsDriver({ session, ownTeamId }: MechanicsDriverProps) {
         mech = mechanicsFromSnapshot(team, mech);
         const repair = repairStateFromView(team.repair);
         if (repair) store.setRepair(repair);
+        if (team.refuel) store.setRefuel(team.refuel);
+        const pitActive = team.status === "pit";
+        const pitReady = team.pitReady === true;
+        if (pitActive !== store.pitActive || pitReady !== store.pitReady) store.setPit({ pitActive, pitReady });
         if (team.hoodOpen !== undefined && team.hoodOpen !== store.hoodOpen) store.setHoodOpen(team.hoodOpen);
       }
     } else if (store.race.phase === "running") {
@@ -64,6 +70,27 @@ export function MechanicsDriver({ session, ownTeamId }: MechanicsDriverProps) {
         hoodOpen: store.hoodOpen,
         dt,
       });
+      const pit = session.stage.pit;
+      if (pit) {
+        const position = vehicle.currentPosition;
+        const inside = isInsidePitBox(pit, position.x, position.z);
+        if (!store.pitActive && inside && Math.abs(vehicle.forwardSpeed) < PIT.MAX_ENTRY_SPEED_MS) {
+          store.setPit({ pitActive: true, pitReady: false });
+        } else if (store.pitActive && !inside) {
+          store.setPit({ pitActive: false, pitReady: false });
+          store.setRefuel(initialRefuel());
+        }
+        if (store.pitActive) {
+          mech = { ...mech, fuel01: stepRefuel(store.refuel, mech.fuel01, dt).fuel01 };
+          const ready =
+            mech.fuel01 >= PIT.MIN_FUEL_TO_RELEASE &&
+            mech.engineStatus !== "failed" &&
+            !store.hoodOpen &&
+            store.footRole === null &&
+            store.refuel.kind === "idle";
+          if (ready !== store.pitReady) store.setPit({ pitActive: true, pitReady: ready });
+        }
+      }
       if (impacts.solidImpulse >= MECHANICS.CRASH_IMPULSE) {
         mech = applyCrash(mech, session.stage.seed, crashIndex.current);
         crashIndex.current += 1;

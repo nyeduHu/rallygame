@@ -161,6 +161,16 @@ export const repairViewSchema = z.object({
 }).strict();
 export type RepairView = z.infer<typeof repairViewSchema>;
 
+export const refuelStepSchema = z.object({
+  step: z.enum(["OPEN_FLAP", "CLOSE_FLAP", "GRAB_HOSE", "CONNECT", "START", "STOP", "DISCONNECT", "RETURN_HOSE"]),
+}).strict();
+export type RefuelStepPayload = z.infer<typeof refuelStepSchema>;
+
+export const refuelViewSchema = z.object({
+  kind: z.enum(["idle", "hose_held", "connected", "fueling"]),
+  flapOpen: z.boolean(),
+}).strict();
+
 export const codriverWipersSchema = z.object({
   on: z.boolean(),
 }).strict();
@@ -198,6 +208,8 @@ export const teamSnapshotSchema = z.object({
   brokenPart: brokenPartSchema.nullable().optional(),
   penaltyMs: z.number().finite().nonnegative().optional(),
   repair: repairViewSchema.optional(),
+  refuel: refuelViewSchema.optional(),
+  pitReady: z.boolean().optional(),
   hoodOpen: z.boolean().optional(),
   occupancy: z.object({ driver: seatStateSchema, codriver: seatStateSchema }).strict().optional(),
 }).strict();
@@ -258,6 +270,7 @@ export const clientEventSchemas = {
   "car:impact": carImpactSchema,
   "seat:set": seatSetSchema,
   "repair:step": repairStepSchema,
+  "refuel:step": refuelStepSchema,
   "foot:pose": footPoseSchema,
   "codriver:wipers": codriverWipersSchema,
   "clock:ping": clockPingSchema,

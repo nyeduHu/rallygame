@@ -1,7 +1,7 @@
 // server/net/gateway.ts
 import type { Server, Socket } from "socket.io";
 import { NET } from "../../lib/net/netConstants";
-import { type ClientEventName, carImpactSchema, carInputsSchema, clientEventSchemas, footPoseSchema, poseReportSchema, repairStepSchema, seatSetSchema } from "../../lib/net/protocol";
+import { type ClientEventName, carImpactSchema, carInputsSchema, clientEventSchemas, footPoseSchema, poseReportSchema, refuelStepSchema, repairStepSchema, seatSetSchema } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
 import { RoomManager } from "../rooms/roomManager";
 import { RaceController } from "../race/raceController";
@@ -184,6 +184,17 @@ export function bindGateway(
             startRace(room);
           }
           return result;
+        }
+
+        if (event === "refuel:step") {
+          const room = roomForPlayer(roomManager, socket);
+          const playerId = String(socket.data.playerId ?? "");
+          const race = room ? races.get(room.code) : undefined;
+          const teamId = room ? teamOf(room, playerId) : null;
+          const role = room?.players.get(playerId)?.role;
+          if (!room || !race || !teamId || !role) return { ok: false, error: "not_found" };
+          const error = race.controller.refuelStep(teamId, role, refuelStepSchema.parse(data));
+          return error ? { ok: false as const, error } : { ok: true as const };
         }
 
         if (event === "repair:step") {

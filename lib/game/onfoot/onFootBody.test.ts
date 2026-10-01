@@ -30,6 +30,7 @@ const STAGE: StageData = {
   terrain: { originX: 0, originZ: 0, cellSize: 1, cols: 0, rows: 0, heights: new Float32Array() },
   startS: 10, finishS: LENGTH - 10, checkpointS: [], trees: [], rocks: [], grass: [], barriers: [], cones: [],
   spawn: { x: 0, y: 0, z: CAR_Z, heading: 0 },
+  pit: null,
 };
 
 /** Walks the capsule at a heading for a while and returns where it ends. */

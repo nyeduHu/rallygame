@@ -17,6 +17,8 @@ import { Cones } from "./Cones";
 import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
+import { FuelPump } from "../pit/FuelPump";
+import { PitArea } from "../pit/PitArea";
 import { OnFootRig } from "../onfoot/OnFootRig";
 import { PlayerBodies } from "../onfoot/PlayerBodies";
 import { MechanicsDriver } from "./MechanicsDriver";
@@ -96,6 +98,8 @@ export function GameScene({
       {session instanceof RemoteSession && online && <RemoteDriver session={session} teamId={online.ownTeamId} />}
       {online && role === "driver" && session instanceof GameSession && <NetDriver session={session} />}
       {online && <GhostCars teamIds={online.remoteTeamIds} />}
+      {session.stage.pit && <PitArea pit={session.stage.pit} />}
+      {session.stage.pit && <FuelPump pit={session.stage.pit} session={session} />}
       <OnFootRig
         session={session}
         road={road}

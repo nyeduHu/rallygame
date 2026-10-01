@@ -4,6 +4,7 @@ import { createRng, deriveSeed } from "../random";
 import { gateHalfWidth, placeBarriers, placeCones, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
 import { RoadIndex, poseAt } from "./roadIndex";
 import { generateRoadLayout, validateRoadLayout, type RoadLayout } from "./roadLayout";
+import { clearPitArea, placePit } from "./pitStop";
 import { applyRoadElevation, buildTerrain } from "./terrain";
 import type { StageData } from "./types";
 
@@ -18,6 +19,16 @@ const SALT = {
 } as const;
 
 /**
+ * Whether a pit box can be placed on a layout; part of validity so every stage has a pit.
+ * @param layout - Candidate road layout.
+ * @returns True when {@link placePit} finds a spot.
+ */
+function hasPit(layout: RoadLayout): boolean {
+  const length = layout.samples[layout.samples.length - 1].s;
+  return placePit(layout.samples, layout.corners, ROAD.START_LINE_OFFSET, length - ROAD.FINISH_LINE_OFFSET) !== null;
+}
+
+/**
  * Finds the first layout attempt that validates. Attempts are derived from the
  * seed, so every client converges on the same attempt.
  * @param seed - Stage seed.
@@ -27,7 +38,7 @@ function findValidLayout(seed: number): { layout: RoadLayout; attempt: number } 
   for (let attempt = 0; attempt < ROAD.MAX_GENERATION_ATTEMPTS; attempt++) {
     const rng = createRng(deriveSeed(deriveSeed(seed, SALT.LAYOUT), attempt));
     const layout = generateRoadLayout(rng);
-    if (validateRoadLayout(layout)) return { layout, attempt };
+    if (validateRoadLayout(layout) && hasPit(layout)) return { layout, attempt };
   }
   throw new Error(`Road generation failed validation for seed ${seed} after ${ROAD.MAX_GENERATION_ATTEMPTS} attempts`);
 }
@@ -77,6 +88,7 @@ export function generateStage(seed: number): StageData {
     gatePoints,
   });
 
+  const pit = placePit(samples, layout.corners, startS, finishS);
   const spawnPose = poseAt(samples, startS - VEHICLE.SPAWN_BEHIND_START);
 
   return {
@@ -89,11 +101,12 @@ export function generateStage(seed: number): StageData {
     startS,
     finishS,
     checkpointS,
-    trees: scatterTrees(contextFor(SALT.TREES)),
-    rocks: scatterRocks(contextFor(SALT.ROCKS)),
-    grass: scatterGrass(contextFor(SALT.GRASS)),
-    barriers: placeBarriers(contextFor(SALT.STRUCTURES), layout.corners),
-    cones: placeCones(contextFor(SALT.STRUCTURES), layout.corners),
+    trees: clearPitArea(scatterTrees(contextFor(SALT.TREES)), pit),
+    rocks: clearPitArea(scatterRocks(contextFor(SALT.ROCKS)), pit),
+    grass: clearPitArea(scatterGrass(contextFor(SALT.GRASS)), pit),
+    barriers: clearPitArea(placeBarriers(contextFor(SALT.STRUCTURES), layout.corners), pit),
+    cones: clearPitArea(placeCones(contextFor(SALT.STRUCTURES), layout.corners), pit),
     spawn: spawnPose,
+    pit,
   };
 }
