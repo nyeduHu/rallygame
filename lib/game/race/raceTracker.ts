@@ -62,6 +62,16 @@ export class RaceTracker {
     if (this.phase === "ready") this.phase = "countdown";
   }
 
+  /**
+   * Starts the countdown so it ends at a server-chosen instant.
+   * @param remainingSeconds - Seconds until the shared go time (clamped to the default length).
+   */
+  beginCountdownAt(remainingSeconds: number): void {
+    if (this.phase !== "ready") return;
+    this.countdown = Math.min(SIMULATION.COUNTDOWN_SECONDS, Math.max(0, remainingSeconds));
+    this.phase = "countdown";
+  }
+
   /** @returns Current phase. */
   get currentPhase(): RacePhase {
     return this.phase;

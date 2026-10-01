@@ -14,7 +14,10 @@
 4. If something is unclear, blocked, or needs a decision not listed in section 2: **stop and write the question at the bottom of this file under `## Open questions`**, then continue with the next unblocked step. Never guess, never hack around it.
 5. Do not refactor Phase 1 code unless a step explicitly says so. Extend it; do not rewrite it.
 6. The user said: **no security-audit, UI/UX-review or code-review passes** for this project. Do not spawn or simulate them. Still follow every rule in section 1; the rules are not optional just because nobody reviews.
-7. Keep your progress notes terse: after each step append one line to `## Progress log` at the bottom (step id, date, one sentence).
+7. Keep your progress notes terse: after each step append one line to `- [Step 3.7 client] Co-driver in online mode still runs its own local physics instead of following the team snapshot (no Rapier-free cockpit path yet) — GameScene/CarRig/CameraRig/Lighting all take a GameSession; left as-is.
+- [Step 3.7/3.8] Ghost cars are coloured chassis boxes, not the Kenney hatchback (CarExterior is bound to the local session); no name tags yet.
+
+## Progress log` at the bottom (step id, date, one sentence).
 
 ---
 
@@ -655,3 +658,4 @@ _(Codex: one line per finished step. Format: `- [step id] YYYY-MM-DD — what wa
 - [Plan order] 2026-10-01 — per user direction, jumped to Phase 3; Steps 2.5 and 2.6 remain deferred and unfinished.
 - [Step 3.1] 2026-10-01 — added Express/Socket.IO server, validated env, health endpoint and dev:all scripts; server/root TypeScript, ESLint, build, tests (20) and `/health` pass; existing port 3000 server prevented a second Next dev process from holding the lock.
 - [Step 3.7 server] 2026-10-01 — added shared checkpointLogic (RaceTracker refactored), poseValidator (500 m teleport rejected), authoritative RaceController and gateway wiring (start/pose/wipers/snapshots/results); server tsc, eslint and tests pass. Client wiring and RoomResults UI remain.
+- [Step 3.5-3.8 client] 2026-10-01 — real SnapshotBuffer (lerp/slerp, 250 ms extrapolation) and clockSync tests, net store, useRoom race stream + clock sync, NetDriver pose streaming, GhostCars, RaceTracker.beginCountdownAt, RoomResults UI, /rally/new + /rally/[code] lobby-to-race page, spec §20 results test; tsc, eslint, 38 tests and build pass. Not verified in a browser with two tabs.

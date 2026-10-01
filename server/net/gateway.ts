@@ -70,6 +70,7 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
             roomCode: room.code,
             playerId: host.id,
             resumeToken: host.resumeToken,
+            room: room.toView(),
           };
         }
 

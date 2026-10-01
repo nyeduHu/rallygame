@@ -23,6 +23,8 @@ interface RallyGameProps {
   seed: number;
   role: Role;
   solo: boolean;
+  /** Online room race: the server owns start time and results; omit for the solo prototype. */
+  online?: { remoteTeamIds: string[] };
 }
 
 const METRES_PER_KM = 1000;
@@ -35,7 +37,7 @@ const PIXEL_RATIO: [number, number] = [1, RENDER.MAX_PIXEL_RATIO];
  * @param props - Stage seed.
  * @returns Canvas plus DOM overlays.
  */
-export function RallyGame({ seed, role, solo }: RallyGameProps) {
+export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
   const { session, road, terrain, error } = useGameSession(seed);
   const keyboard = useMemo(() => new KeyboardControls(solo), [solo]);
   const mouseLook = useMemo(() => new MouseLook(), []);
@@ -119,6 +121,7 @@ export function RallyGame({ seed, role, solo }: RallyGameProps) {
               solo={solo}
               mouseLook={mouseLook}
               interactionSystem={interactionSystem}
+              online={online}
               onReady={handleReady}
             />
           </Suspense>
@@ -129,14 +132,14 @@ export function RallyGame({ seed, role, solo }: RallyGameProps) {
           <Hud />
           <Crosshair />
           {showTuningPanel && <TuningPanel />}
-          {phase === "ready" && (
+          {phase === "ready" && !online && (
             <StartOverlay
               seed={seed}
               stageLengthKm={((session.stage.finishS - session.stage.startS) / METRES_PER_KM).toFixed(KM_DECIMALS)}
               onStart={handleStart}
             />
           )}
-          {phase === "finished" && finishTime !== null && (
+          {phase === "finished" && finishTime !== null && !online && (
             <FinishOverlay finishTime={finishTime} splits={splits} onRestart={handleRestart} />
           )}
         </>

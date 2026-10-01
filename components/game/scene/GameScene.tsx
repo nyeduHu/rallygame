@@ -16,6 +16,8 @@ import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
 import { SimulationDriver } from "./SimulationDriver";
+import { GhostCars } from "./GhostCars";
+import { NetDriver } from "./NetDriver";
 import { StageProps } from "./StageProps";
 import { InteractionDriver } from "../interaction/InteractionDriver";
 import type { InteractionSystem } from "@/lib/game/interaction/interactionSystem";
@@ -34,6 +36,8 @@ interface GameSceneProps {
   solo: boolean;
   interactionSystem: InteractionSystem;
   mouseLook: MouseLook;
+  /** Online race: other teams to draw as ghosts; the driver also streams poses. */
+  online?: { remoteTeamIds: string[] };
   /** Called once all suspended assets have mounted. */
   onReady: () => void;
 }
@@ -64,6 +68,7 @@ export function GameScene({
   solo,
   mouseLook,
   interactionSystem,
+  online,
   onReady,
 }: GameSceneProps) {
   return (
@@ -77,6 +82,8 @@ export function GameScene({
       <CarRig session={session} role={role} solo={solo} />
       <CameraRig session={session} mouseLook={mouseLook} role={role} solo={solo} />
       <SimulationDriver session={session} keyboard={keyboard} role={role} solo={solo} />
+      {online && role === "driver" && <NetDriver session={session} />}
+      {online && <GhostCars teamIds={online.remoteTeamIds} />}
       <ReadySignal onReady={onReady} />
     </InteractionDriver>
   );

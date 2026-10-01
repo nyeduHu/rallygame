@@ -438,6 +438,11 @@ export class Vehicle {
     quaternion.slerpQuaternions(this.previousQuaternion, this.currentQuaternion, alpha);
   }
 
+  /** @returns Chassis linear velocity in world space (m/s), for network pose reports. */
+  get currentVelocity(): { x: number; y: number; z: number } {
+    return this.body.linvel();
+  }
+
   /** @returns Majority surface under grounded wheels, or null when airborne. */
   get surface(): SurfaceKind | null {
     let gravel = 0;
