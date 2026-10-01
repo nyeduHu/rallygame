@@ -2,13 +2,13 @@
 import { DRIVETRAIN, ON_FOOT, VEHICLE } from "../../lib/game/constants";
 import { applyRefuelStep, initialRefuel, stepRefuel, tangle, type RefuelState } from "../../lib/game/refuel/refuelMachine";
 import { isInsidePitBox } from "../../lib/game/stage/pitStop";
-import { PIT, REFUEL } from "../../lib/game/constants";
+import { NETWORK, PIT, REFUEL } from "../../lib/game/constants";
 import { applyStep, settle, type RepairState } from "../../lib/game/repair/repairMachine";
 import { REPAIR } from "../../lib/game/constants";
 import { canExit, canReenter, doorPosition } from "../../lib/game/onfoot/onFootController";
 import { stepCheckpoints, type CheckpointState } from "../../lib/game/race/checkpointLogic";
 import { generateStage } from "../../lib/game/stage/generateStage";
-import { RoadIndex } from "../../lib/game/stage/roadIndex";
+import { NetworkIndex } from "../../lib/game/stage/networkIndex";
 import type { StageData } from "../../lib/game/stage/types";
 import { NET } from "../../lib/net/netConstants";
 import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, RefuelStepPayload, RepairStepPayload, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
@@ -43,6 +43,7 @@ interface TeamRaceState {
   ledger: PenaltyLedger;
   inputs: CarInputs | null;
   lastLateral: number;
+  deadEndDistance: number;
   hoodOpen: boolean;
   crashIndex: number;
   /** Server time the engine last failed, for the repair-timeout DNF. */
@@ -89,7 +90,7 @@ const NEUTRAL_POSE: Pick<PoseReport, "p" | "q" | "v" | "steer" | "wheelSpin" | "
 /** Authoritative race state for one room: validates poses, tracks progress, builds snapshots and results. */
 export class RaceController {
   private readonly stage: StageData;
-  private readonly index: RoadIndex;
+  private readonly index: NetworkIndex;
   private readonly teams = new Map<string, TeamRaceState>();
   private goAtMs = 0;
   private lastTickMs = 0;
@@ -106,7 +107,7 @@ export class RaceController {
     private readonly now: () => number = () => Date.now(),
   ) {
     this.stage = generateStage(room.seed);
-    this.index = new RoadIndex(this.stage.samples);
+    this.index = new NetworkIndex(this.stage.samples, this.stage.branches);
     for (const team of room.teams.values()) {
       if (!team.driverId || !team.codriverId) continue;
       this.teams.set(team.id, {
@@ -124,6 +125,7 @@ export class RaceController {
         ledger: new PenaltyLedger(),
         inputs: null,
         lastLateral: 0,
+        deadEndDistance: 0,
         hoodOpen: false,
         crashIndex: 0,
         failedAtMs: null,
@@ -298,6 +300,11 @@ export class RaceController {
     team.repairStartedMs = null;
   }
 
+  /** @returns A team's accumulated time penalties in ms (tests and tools). */
+  penaltyMsOf(teamId: string): number {
+    return this.teams.get(teamId)?.ledger.penaltyMs ?? 0;
+  }
+
   /** @returns A team's current mechanical state (for snapshots and tests), or null. */
   mechanicsOf(teamId: string): MechanicalState | null {
     return this.teams.get(teamId)?.mech ?? null;
@@ -329,6 +336,8 @@ export class RaceController {
     }
     const wasReset = team.lastPose !== null && report.epoch > team.lastPose.report.epoch;
     team.lastLateral = projection.lateral;
+    team.deadEndDistance = projection.deadEndDistance;
+    team.ledger.trackDeadEnd(projection.deadEndDistance);
     team.lastPose = { report, atMs: nowMs };
     this.updatePit(team, report, nowMs);
     // A reset teleports the car; re-anchor progress so the jump guard in stepCheckpoints does not freeze it.
@@ -589,6 +598,7 @@ export class RaceController {
       hoodOpen: team.hoodOpen,
       refuel: team.refuel,
       pitReady: team.pitReady,
+      wrongWay: team.deadEndDistance > NETWORK.WRONG_WAY_GRACE_M,
     };
   }
 

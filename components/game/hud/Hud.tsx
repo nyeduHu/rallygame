@@ -25,6 +25,20 @@ function Countdown() {
 }
 
 /**
+ * Warning while deep in a dead-end road: turn around or reset to the junction.
+ * @returns Banner or nothing.
+ */
+function WrongWayBanner() {
+  const wrongWay = useGameStore((state) => state.race.wrongWay);
+  if (!wrongWay) return null;
+  return (
+    <p aria-live="assertive" className="rounded-md bg-hud-danger px-4 py-2 font-mono text-lg font-bold">
+      DEAD END? Turn around (R resets to the junction)
+    </p>
+  );
+}
+
+/**
  * Pit stop banner: what is still missing, then GO.
  * @returns Banner or nothing.
  */
@@ -63,6 +77,7 @@ export function Hud() {
       <div className="flex flex-col items-center gap-2">
         <StageTimer />
         <PitBanner />
+        <WrongWayBanner />
       </div>
       <div className="flex flex-col items-center gap-3">
         <Countdown />

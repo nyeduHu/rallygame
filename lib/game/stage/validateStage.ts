@@ -1,8 +1,8 @@
 // lib/game/stage/validateStage.ts
-import { CHECKPOINT, DIFFICULTY, PACE_NOTES, ROAD } from "../constants";
+import { CHECKPOINT, DIFFICULTY, NETWORK, PACE_NOTES, ROAD } from "../constants";
 import { generatePaceNotes } from "./paceNotes";
 import { placePit } from "./pitStop";
-import type { StageData } from "./types";
+import type { RoadBranch, StageData } from "./types";
 
 /** The parts of a stage the validators need (available before terrain and props exist). */
 export type StageCandidate = Pick<StageData, "samples" | "corners" | "startS" | "finishS" | "checkpointS" | "length">;
@@ -80,7 +80,7 @@ export function checkpointsReachable(stage: StageCandidate): Check {
 /** Every corner has one short, speakable note and the notes are not too dense. */
 export function readableFromNotes(stage: StageCandidate): Check {
   const notes = generatePaceNotes(stage);
-  const cornerNotes = notes.filter((note) => note.kind !== "straight" && note.kind !== "finish");
+  const cornerNotes = notes.filter((note) => note.kind !== "straight" && note.kind !== "finish" && note.kind !== "junction");
   if (cornerNotes.length !== stage.corners.length) return fail("note count differs from corner count");
   for (const note of notes) {
     if (note.text.length > PACE_NOTES.MAX_TEXT_LENGTH) return fail(`note "${note.text}" too long`);
@@ -111,6 +111,19 @@ export function fairDifficulty(stage: StageCandidate, stageIndex = 0): Check {
     for (let i = 1; i < hairpins.length; i++) {
       if (hairpins[i].apexS - hairpins[i - 1].apexS < DIFFICULTY.STAGE0_HAIRPIN_SPACING) return fail("two hairpins too close for stage 0");
     }
+  }
+  return PASS;
+}
+
+/** Every stage has at least one alternative route and one dead end, and no gate sits in a fork. */
+export function networkFair(stage: StageCandidate & { branches: ReadonlyArray<RoadBranch> }): Check {
+  if (!stage.branches.some((branch) => branch.kind === "alternative")) return fail("no alternative route");
+  if (!stage.branches.some((branch) => branch.kind === "dead_end")) return fail("no dead end");
+  const gates = [stage.startS, ...stage.checkpointS, stage.finishS];
+  for (const branch of stage.branches) {
+    const from = branch.forkS - NETWORK.FORK_GATE_CLEARANCE_M;
+    const to = (branch.joinS ?? branch.forkS) + NETWORK.FORK_GATE_CLEARANCE_M;
+    if (gates.some((gate) => gate > from && gate < to)) return fail(`gate inside fork ${branch.id}`);
   }
   return PASS;
 }

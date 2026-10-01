@@ -8,20 +8,40 @@ import { CanvasTexture, SRGBColorSpace, Vector3, type MeshBasicMaterial } from "
 import { TABLET } from "@/lib/game/constants";
 import type { SessionView } from "@/lib/game/sessionView";
 import { PALETTE } from "@/lib/game/palette";
-import { generatePaceNotes } from "@/lib/game/stage/paceNotes";
-import { RoadIndex, poseAt } from "@/lib/game/stage/roadIndex";
-import type { PaceNote } from "@/lib/game/stage/types";
+import { generateBranchNotes, generateRouteNotes } from "@/lib/game/stage/paceNotes";
+import { NetworkIndex } from "@/lib/game/stage/networkIndex";
+import { poseAt } from "@/lib/game/stage/roadIndex";
+import type { PaceNote, RoadSample } from "@/lib/game/stage/types";
 import { Interactable } from "../interaction/Interactable";
 import type { InteractableSpec } from "@/lib/game/interaction/interactionSystem";
 import type { Role } from "@/lib/game/roles";
 import {
-  fitRoadToViewport,
+  computeFit,
+  createReveal,
+  finishDirection,
+  fitPoint,
+  isRevealedAt,
+  revealedRuns,
+  updateReveal,
+  type MapFit,
+  type RevealState,
+} from "@/lib/game/map/networkMap";
+import {
   mapHeadingToCanvasAngle,
   projectNextPoint,
   type MapPoint,
   type MapViewport,
   type MapWorldPoint,
 } from "@/lib/game/map/mapRenderer";
+
+/** Everything the tablet needs about the road network, built once per stage. */
+interface TabletData {
+  network: NetworkIndex;
+  routeNotes: PaceNote[];
+  branchNotes: Map<number, PaceNote[]>;
+  reveal: RevealState;
+  fit: MapFit;
+}
 
 type TabletMode = "NEXT" | "OVERVIEW";
 
@@ -51,12 +71,7 @@ export function Tablet({ session, activeRole }: TabletProps) {
   const contentKeyRef = useRef<string | null>(null);
   const [mode, setMode] = useState<TabletMode>("NEXT");
   const stage = session.stage;
-  const notes = useMemo(() => generatePaceNotes(stage), [stage]);
-  const roadIndex = useMemo(() => new RoadIndex(stage.samples), [stage]);
-  const overviewRoad = useMemo(
-    () => fitRoadToViewport(stage.samples, mapViewport(), TABLET.MAP_MARGIN),
-    [stage],
-  );
+  const [data] = useState<TabletData>(() => createTabletData(stage));
   const toggleMode = useCallback(() => {
     setMode((current) => (current === "NEXT" ? "OVERVIEW" : "NEXT"));
   }, []);
@@ -78,8 +93,8 @@ export function Tablet({ session, activeRole }: TabletProps) {
     const nextTexture = new CanvasTexture(canvas);
     nextTexture.colorSpace = SRGBColorSpace;
     textureRef.current = nextTexture;
-    drawTablet(canvas, session, notes, roadIndex, overviewRoad, mode);
-    contentKeyRef.current = getTabletContentKey(session, notes, roadIndex, overviewRoad, mode);
+    drawTablet(canvas, session, data, mode);
+    contentKeyRef.current = getTabletContentKey(session, data, mode);
     nextTexture.needsUpdate = true;
     const screenMaterial = screenMaterialRef.current;
     if (screenMaterial) {
@@ -95,7 +110,7 @@ export function Tablet({ session, activeRole }: TabletProps) {
       textureRef.current = null;
       canvasRef.current = null;
     };
-  }, [mode, notes, overviewRoad, roadIndex, session]);
+  }, [mode, data, session]);
 
   useFrame((_, delta) => {
     const activeTexture = textureRef.current;
@@ -103,10 +118,10 @@ export function Tablet({ session, activeRole }: TabletProps) {
     elapsedRef.current += delta;
     if (elapsedRef.current < 1 / TABLET.REDRAW_HZ) return;
     elapsedRef.current %= 1 / TABLET.REDRAW_HZ;
-    const nextContentKey = getTabletContentKey(session, notes, roadIndex, overviewRoad, mode);
+    const nextContentKey = getTabletContentKey(session, data, mode);
     if (nextContentKey === contentKeyRef.current) return;
     contentKeyRef.current = nextContentKey;
-    drawTablet(canvasRef.current, session, notes, roadIndex, overviewRoad, mode);
+    drawTablet(canvasRef.current, session, data, mode);
     activeTexture.needsUpdate = true;
   });
 
@@ -147,41 +162,96 @@ function mapViewport(): MapViewport {
 }
 
 /**
- * Produces a compact visual-state key so an unchanged screen avoids canvas work and GPU uploads.
- * @param session - Current stage session and interpolated car pose.
- * @param notes - Stage calls memoized once per stage.
- * @param roadIndex - Stage spatial projection index.
- * @param overviewRoad - Whole-stage fitted polyline.
- * @param mode - Current map scale mode.
- * @returns Quantized key for all visible dynamic tablet content.
+ * Builds the per-stage tablet data: the network index, notes for every road, the fog of war
+ * and the overview fit.
+ * @param stage - Stage with its side roads.
+ * @returns Tablet data.
  */
-function getTabletContentKey(
-  session: SessionView,
-  notes: ReadonlyArray<PaceNote>,
-  roadIndex: RoadIndex,
-  overviewRoad: ReadonlyArray<MapPoint>,
-  mode: TabletMode,
-): string {
+function createTabletData(stage: SessionView["stage"]): TabletData {
+  const reveal = createReveal(stage);
+  return {
+    network: new NetworkIndex(stage.samples, stage.branches),
+    routeNotes: generateRouteNotes(stage),
+    branchNotes: new Map(stage.branches.map((branch) => [branch.id, generateBranchNotes(branch)])),
+    reveal,
+    fit: computeFit(reveal.paths, mapViewport(), TABLET.MAP_MARGIN),
+  };
+}
+
+/** Where the car is on the network and which notes apply there. */
+interface Located {
+  car: MapWorldPoint;
+  /** Progress on the reference route (equivalent progress when on a side road). */
+  progress: number;
+  notes: ReadonlyArray<PaceNote>;
+  /** Progress along the road the notes belong to. */
+  noteProgress: number;
+  branchId: number | null;
+}
+
+/**
+ * Finds the car on the network, uncovers the road around it and picks the notes for the road it
+ * is on.
+ * @param session - Session with the interpolated car pose.
+ * @param data - Tablet data (its fog of war is updated).
+ * @returns Car position, progress and the active notes.
+ */
+function locate(session: SessionView, data: TabletData): Located {
   const position = session.renderPosition;
   const headingVector = WORLD_FORWARD.clone().applyQuaternion(session.renderQuaternion);
   const heading = Math.atan2(headingVector.x, headingVector.z);
-  const projection = roadIndex.nearest(position.x, position.z, TABLET.PROJECTION_SEARCH_RADIUS);
+  updateReveal(data.reveal, position.x, position.z, TABLET.REVEAL_RADIUS_M);
+  const projection = data.network.nearest(position.x, position.z, TABLET.PROJECTION_SEARCH_RADIUS);
   const progress = projection?.s ?? session.stage.startS;
-  const car: MapWorldPoint = { x: position.x, z: position.z, s: progress, heading };
+  const branchId = projection?.branchId ?? null;
+  const notes = branchId === null ? data.routeNotes : (data.branchNotes.get(branchId) ?? data.routeNotes);
+  const noteProgress = branchId === null ? progress : (projection?.localS ?? 0);
+  return { car: { x: position.x, z: position.z, s: progress, heading }, progress, notes, noteProgress, branchId };
+}
+
+/**
+ * Builds the world-to-canvas projection for a map mode.
+ * @param mode - NEXT (heading up, zoomed) or OVERVIEW (north up, whole network).
+ * @param car - Car world point.
+ * @param data - Tablet data (for the overview fit).
+ * @returns Projection into map canvas coordinates (below the header).
+ */
+function makeProjector(mode: TabletMode, car: MapWorldPoint, data: TabletData): (world: MapWorldPoint) => MapPoint {
   const viewport = mapViewport();
   const pixelsPerMetre = Math.max(
     0,
     (viewport.height * TABLET.NEXT_CAR_VERTICAL_RATIO - TABLET.MAP_MARGIN) / TABLET.NEXT_WINDOW_METRES,
   );
-  const marker = mode === "NEXT"
-    ? projectNextPoint(car, car, viewport, pixelsPerMetre, TABLET.NEXT_CAR_VERTICAL_RATIO)
-    : mapOverviewPoint(car, overviewRoad, session.stage.length);
+  return (world) => {
+    const point = mode === "NEXT"
+      ? projectNextPoint(world, car, viewport, pixelsPerMetre, TABLET.NEXT_CAR_VERTICAL_RATIO)
+      : fitPoint(data.fit, world.x, world.z, world.s, world.heading);
+    return { ...point, y: point.y + TABLET.HEADER_HEIGHT };
+  };
+}
+
+/**
+ * Produces a compact visual-state key so an unchanged screen avoids canvas work and GPU uploads.
+ * @param session - Current stage session and interpolated car pose.
+ * @param data - Tablet data.
+ * @param mode - Current map scale mode.
+ * @returns Quantized key for all visible dynamic tablet content.
+ */
+function getTabletContentKey(session: SessionView, data: TabletData, mode: TabletMode): string {
+  const located = locate(session, data);
+  const { car, notes, noteProgress, progress } = located;
+  const marker = makeProjector(mode, car, data)(car);
   const canvasHeading = mapHeadingToCanvasAngle(marker.heading);
-  const current = notes.find((note) => note.atS >= progress) ?? notes[notes.length - 1];
+  const current = notes.find((note) => note.atS >= noteProgress) ?? notes[notes.length - 1];
   const currentIndex = Math.max(0, notes.indexOf(current));
   const following = notes[currentIndex + 1] ?? current;
-  const visibleDistance = Math.round(Math.max(0, current.atS - progress));
-  const nextRoadPixel = mode === "NEXT" ? Math.round(progress * pixelsPerMetre) : 0;
+  const visibleDistance = Math.round(Math.max(0, current.atS - noteProgress));
+  const finish = poseAt(session.stage.samples, session.stage.finishS);
+  const finishDistance = Math.round(finishDirection(car, finish).distance / TABLET.FINISH_DISTANCE_STEP_M);
+  const viewport = mapViewport();
+  const nextRoadPixel = mode === "NEXT"
+    ? Math.round(progress * ((viewport.height * TABLET.NEXT_CAR_VERTICAL_RATIO - TABLET.MAP_MARGIN) / TABLET.NEXT_WINDOW_METRES))
+    : 0;
 
   return [
     mode,
@@ -189,54 +259,36 @@ function getTabletContentKey(
     Math.round(marker.x),
     Math.round(marker.y),
     Math.round(canvasHeading * TABLET.DEGREES_PER_RADIAN),
-    Math.round(heading * TABLET.DEGREES_PER_RADIAN),
+    Math.round(car.heading * TABLET.DEGREES_PER_RADIAN),
     nextRoadPixel,
     current.text,
     following.text,
     visibleDistance,
+    data.reveal.count,
+    located.branchId ?? "main",
+    finishDistance,
   ].join("|");
 }
 
 /**
- * Redraws map, markers, legend, and call strip onto the existing canvas.
+ * Redraws map, markers, legend, and call strip onto the existing canvas. Only roads the car has
+ * seen are drawn; the finish is shown as a direction and distance rather than a map position.
  * @param canvas - Persistent screen canvas.
  * @param session - Current stage and interpolated vehicle pose.
- * @param notes - Pace calls memoized once per stage.
- * @param roadIndex - Stage spatial projection index.
- * @param overviewRoad - Whole-stage fitted polyline.
+ * @param data - Tablet data.
  * @param mode - Current map scale mode.
  */
-function drawTablet(
-  canvas: HTMLCanvasElement,
-  session: SessionView,
-  notes: ReadonlyArray<PaceNote>,
-  roadIndex: RoadIndex,
-  overviewRoad: ReadonlyArray<MapPoint>,
-  mode: TabletMode,
-): void {
+function drawTablet(canvas: HTMLCanvasElement, session: SessionView, data: TabletData, mode: TabletMode): void {
   const context = canvas.getContext("2d");
   if (!context) return;
   const viewport = mapViewport();
   const { stage } = session;
-  const position = session.renderPosition;
-  const headingVector = WORLD_FORWARD.clone().applyQuaternion(session.renderQuaternion);
-  const heading = Math.atan2(headingVector.x, headingVector.z);
-  const projection = roadIndex.nearest(position.x, position.z, TABLET.PROJECTION_SEARCH_RADIUS);
-  const progress = projection?.s ?? stage.startS;
-  const current = notes.find((note) => note.atS >= progress) ?? notes[notes.length - 1];
+  const located = locate(session, data);
+  const { car, notes, noteProgress, progress } = located;
+  const current = notes.find((note) => note.atS >= noteProgress) ?? notes[notes.length - 1];
   const followingIndex = Math.max(0, notes.indexOf(current));
   const following = notes[followingIndex + 1] ?? notes[followingIndex];
-  const car: MapWorldPoint = { x: position.x, z: position.z, s: progress, heading };
-  const pixelsPerMetre = Math.max(
-    0,
-    (viewport.height * TABLET.NEXT_CAR_VERTICAL_RATIO - TABLET.MAP_MARGIN) / TABLET.NEXT_WINDOW_METRES,
-  );
-  const toPoint = (world: MapWorldPoint): MapPoint => {
-    const point = mode === "NEXT"
-      ? projectNextPoint(world, car, viewport, pixelsPerMetre, TABLET.NEXT_CAR_VERTICAL_RATIO)
-      : mapOverviewPoint(world, overviewRoad, stage.length);
-    return { ...point, y: point.y + TABLET.HEADER_HEIGHT };
-  };
+  const toPoint = makeProjector(mode, car, data);
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = PALETTE.dashboard;
@@ -247,37 +299,34 @@ function drawTablet(
   context.rect(0, TABLET.HEADER_HEIGHT, viewport.width, viewport.height);
   context.clip();
 
-  const shownSamples = mode === "NEXT"
-    ? stage.samples.filter((sample) => sample.s >= progress - TABLET.NEXT_REAR_WINDOW_METRES
-      && sample.s <= progress + TABLET.NEXT_WINDOW_METRES)
-    : stage.samples;
-  drawRoad(context, shownSamples.map((sample) => toPoint(sampleWorldPoint(sample))));
-  drawStartFinish(context, stage, toPoint);
-  drawCheckpoints(context, stage.checkpointS, stage.samples, toPoint);
-  drawDirectionArrows(context, shownSamples, toPoint);
-  drawDistanceTicks(context, stage, progress, mode, toPoint);
-  drawCornerMarkers(context, stage, notes, toPoint);
+  const { reveal } = data;
+  reveal.paths.forEach((path, pathIndex) => {
+    revealedRuns(path, reveal.revealed[pathIndex]).forEach((run) => {
+      drawRoad(context, run.map((sample) => toPoint(sampleWorldPoint(sample))));
+      drawDirectionArrows(context, run, toPoint);
+    });
+  });
+  const referenceFlags = reveal.revealed[0];
+  const referencePath = reveal.paths[0];
+  if (isRevealedAt(referencePath, referenceFlags, stage.startS)) drawStart(context, stage, toPoint);
+  if (isRevealedAt(referencePath, referenceFlags, stage.finishS)) drawFinish(context, stage, toPoint);
+  drawCheckpoints(
+    context,
+    stage.checkpointS.filter((distance) => isRevealedAt(referencePath, referenceFlags, distance)),
+    stage.samples,
+    toPoint,
+  );
+  drawDistanceTicks(context, stage, progress, mode, toPoint, (distance) => isRevealedAt(referencePath, referenceFlags, distance));
+  drawCornerMarkers(context, stage.corners, stage.samples, data.routeNotes, referencePath, referenceFlags, toPoint);
+  stage.branches.forEach((branch) => {
+    const index = reveal.paths.findIndex((path) => path.id === branch.id);
+    drawCornerMarkers(context, branch.corners, branch.samples, data.branchNotes.get(branch.id) ?? [], reveal.paths[index], reveal.revealed[index], toPoint);
+  });
   drawCar(context, toPoint(car));
+  drawFinishBearing(context, stage, car, toPoint, viewport.width);
   context.restore();
-  drawPaceStrip(context, canvas.width, canvas.height, current, following, Math.max(0, current.atS - progress));
+  drawPaceStrip(context, canvas.width, canvas.height, current, following, Math.max(0, current.atS - noteProgress));
   drawLegend(context, canvas.width, canvas.height);
-}
-
-/**
- * Maps a stage-relative point using the precomputed overview fit.
- * @param world - World point and stage progress.
- * @param fitted - Fitted ordered road sample positions.
- * @param stageLength - Total stage length.
- * @returns Interpolated canvas coordinates.
- */
-function mapOverviewPoint(world: MapWorldPoint, fitted: ReadonlyArray<MapPoint>, stageLength: number): MapPoint {
-  const ratio = Math.min(1, Math.max(0, world.s / Math.max(stageLength, 1)));
-  const index = Math.min(fitted.length - 2, Math.floor(ratio * (fitted.length - 1)));
-  const a = fitted[Math.max(0, index)];
-  const b = fitted[Math.min(fitted.length - 1, Math.max(1, index + 1))];
-  const span = Math.max(b.s - a.s, 1);
-  const mix = Math.min(1, Math.max(0, (world.s - a.s) / span));
-  return { x: a.x + (b.x - a.x) * mix, y: a.y + (b.y - a.y) * mix, s: world.s, heading: world.heading };
 }
 
 /**
@@ -327,12 +376,12 @@ function drawRoad(context: CanvasRenderingContext2D, points: ReadonlyArray<MapPo
 }
 
 /**
- * Draws start and checkerboard finish marks.
+ * Draws the start mark.
  * @param context - Canvas context.
  * @param stage - Current stage.
  * @param toPoint - World-to-canvas projection.
  */
-function drawStartFinish(
+function drawStart(
   context: CanvasRenderingContext2D,
   stage: SessionView["stage"],
   toPoint: (point: MapWorldPoint) => MapPoint,
@@ -344,6 +393,19 @@ function drawStartFinish(
     PALETTE.grass,
     TABLET.START_MARKER_RADIUS,
   );
+}
+
+/**
+ * Draws the checkerboard finish mark (only once the finish has been seen).
+ * @param context - Canvas context.
+ * @param stage - Current stage.
+ * @param toPoint - World-to-canvas projection.
+ */
+function drawFinish(
+  context: CanvasRenderingContext2D,
+  stage: SessionView["stage"],
+  toPoint: (point: MapWorldPoint) => MapPoint,
+): void {
   const finish = poseAt(stage.samples, stage.finishS);
   const point = toPoint(sampleWorldPoint({ ...finish, s: stage.finishS }));
   const tile = TABLET.FINISH_CHECKER_SIZE;
@@ -411,29 +473,24 @@ function drawCheckpoints(
 }
 
 /**
- * Places forward chevrons at configured road-progress intervals.
+ * Places forward chevrons along a revealed run of road.
  * @param context - Canvas context.
- * @param samples - Road samples visible in the selected map mode.
+ * @param run - Revealed road samples.
  * @param toPoint - World-to-canvas projection.
  */
 function drawDirectionArrows(
   context: CanvasRenderingContext2D,
-  samples: SessionView["stage"]["samples"],
+  run: ReadonlyArray<RoadSample>,
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {
-  if (samples.length === 0) return;
-  const start = samples[0].s;
-  const end = samples[samples.length - 1].s;
-  const first = Math.ceil(Math.max(0, start) / TABLET.ARROW_SPACING_METRES) * TABLET.ARROW_SPACING_METRES;
   context.strokeStyle = PALETTE.dashboard;
   context.lineWidth = TABLET.DIRECTION_ARROW_STROKE_WIDTH;
-  for (let distance = first; distance <= end; distance += TABLET.ARROW_SPACING_METRES) {
-    const pose = poseAt(samples, distance);
-    const point = toPoint(sampleWorldPoint({ ...pose, s: distance }));
-    const angle = mapHeadingToCanvasAngle(point.heading);
+  run.forEach((sample, i) => {
+    if (i % TABLET.ARROW_SAMPLE_INTERVAL !== TABLET.ARROW_SAMPLE_INTERVAL - 1) return;
+    const point = toPoint(sampleWorldPoint(sample));
     context.save();
     context.translate(point.x, point.y);
-    context.rotate(angle);
+    context.rotate(mapHeadingToCanvasAngle(point.heading));
     context.beginPath();
     context.moveTo(0, -TABLET.DIRECTION_ARROW_LENGTH);
     context.lineTo(-TABLET.DIRECTION_ARROW_HALF_WIDTH, TABLET.DIRECTION_ARROW_BASE_Y);
@@ -441,7 +498,7 @@ function drawDirectionArrows(
     context.lineTo(TABLET.DIRECTION_ARROW_HALF_WIDTH, TABLET.DIRECTION_ARROW_BASE_Y);
     context.stroke();
     context.restore();
-  }
+  });
 }
 
 /**
@@ -451,6 +508,7 @@ function drawDirectionArrows(
  * @param progress - Current car progress.
  * @param mode - Current map mode.
  * @param toPoint - World-to-canvas projection.
+ * @param isSeen - Whether the road at a distance has been revealed.
  */
 function drawDistanceTicks(
   context: CanvasRenderingContext2D,
@@ -458,12 +516,14 @@ function drawDistanceTicks(
   progress: number,
   mode: TabletMode,
   toPoint: (point: MapWorldPoint) => MapPoint,
+  isSeen: (distance: number) => boolean,
 ): void {
   const firstDistance = mode === "OVERVIEW" ? 0 : progress;
   const first = Math.ceil(Math.max(0, firstDistance) / TABLET.DISTANCE_TICK_METRES) * TABLET.DISTANCE_TICK_METRES;
   context.font = `bold ${TABLET.DISTANCE_LABEL_FONT_SIZE}px ${FONT_FAMILY}`;
   context.fillStyle = PALETTE.gaugeFace;
   for (let distance = first; distance < stage.length; distance += TABLET.DISTANCE_TICK_METRES) {
+    if (!isSeen(distance)) continue;
     const pose = poseAt(stage.samples, distance);
     const point = toPoint(sampleWorldPoint({ ...pose, s: distance }));
     context.fillText(
@@ -475,23 +535,30 @@ function drawDistanceTicks(
 }
 
 /**
- * Places numbered severity callouts at corner apexes, with a drawn hairpin curl.
+ * Places numbered severity callouts at corner apexes (only where the road has been seen), with a
+ * drawn hairpin curl.
  * @param context - Canvas context.
- * @param stage - Current stage.
- * @param notes - Stage calls with severity metadata.
+ * @param corners - Corners of the road being drawn.
+ * @param samples - Samples of that road.
+ * @param notes - Calls for that road with severity metadata.
+ * @param path - The road's reveal path.
+ * @param flags - Revealed flags for that road.
  * @param toPoint - World-to-canvas projection.
  */
 function drawCornerMarkers(
   context: CanvasRenderingContext2D,
-  stage: SessionView["stage"],
+  corners: ReadonlyArray<SessionView["stage"]["corners"][number]>,
+  samples: ReadonlyArray<RoadSample>,
   notes: ReadonlyArray<PaceNote>,
+  path: Parameters<typeof isRevealedAt>[0],
+  flags: Uint8Array,
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {
   const cornerNotes = notes.filter((note) => note.cornerIndex >= 0);
   cornerNotes.forEach((note) => {
-    const corner = stage.corners[note.cornerIndex];
-    if (!corner) return;
-    const pose = poseAt(stage.samples, corner.apexS);
+    const corner = corners[note.cornerIndex];
+    if (!corner || !isRevealedAt(path, flags, corner.apexS)) return;
+    const pose = poseAt(samples, corner.apexS);
     const point = toPoint(sampleWorldPoint({ ...pose, s: corner.apexS }));
     if (note.kind === "hairpin") drawHairpinGlyph(context, point, corner.direction);
     else {
@@ -503,14 +570,59 @@ function drawCornerMarkers(
       context.font = `bold ${TABLET.CORNER_MARKER_FONT_SIZE}px ${FONT_FAMILY}`;
       context.textAlign = "center";
       context.textBaseline = "middle";
-      context.fillText(
-        String(note.severity),
-        point.x,
-        point.y + TABLET.CORNER_MARKER_BASELINE_OFFSET,
-      );
+      context.fillText(String(note.severity), point.x, point.y + TABLET.CORNER_MARKER_BASELINE_OFFSET);
       context.textAlign = "left";
     }
   });
+}
+
+/**
+ * Draws the finish compass: an arrow toward the finish in the current map frame and the
+ * straight-line distance. The finish itself stays off the map until the car sees it.
+ * @param context - Canvas context.
+ * @param stage - Current stage.
+ * @param car - Car world point.
+ * @param toPoint - World-to-canvas projection.
+ * @param mapWidth - Map width, for placing the compass in the top-right corner.
+ */
+function drawFinishBearing(
+  context: CanvasRenderingContext2D,
+  stage: SessionView["stage"],
+  car: MapWorldPoint,
+  toPoint: (point: MapWorldPoint) => MapPoint,
+  mapWidth: number,
+): void {
+  const finish = poseAt(stage.samples, stage.finishS);
+  const { distance, far } = finishDirection(car, finish);
+  const from = toPoint(car);
+  const to = toPoint({ x: far.x, z: far.z, s: 0, heading: 0 });
+  const angle = Math.atan2(to.x - from.x, -(to.y - from.y));
+  const cx = mapWidth - TABLET.COMPASS_MARGIN;
+  const cy = TABLET.HEADER_HEIGHT + TABLET.COMPASS_MARGIN;
+  context.save();
+  context.fillStyle = PALETTE.dashboard;
+  context.strokeStyle = PALETTE.gaugeFace;
+  context.lineWidth = TABLET.MARKER_STROKE_WIDTH;
+  context.beginPath();
+  context.arc(cx, cy, TABLET.COMPASS_RADIUS, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.translate(cx, cy);
+  context.rotate(angle);
+  context.fillStyle = PALETTE.grass;
+  context.beginPath();
+  context.moveTo(0, -TABLET.COMPASS_RADIUS + 4);
+  context.lineTo(TABLET.COMPASS_RADIUS * 0.45, TABLET.COMPASS_RADIUS * 0.5);
+  context.lineTo(0, TABLET.COMPASS_RADIUS * 0.2);
+  context.lineTo(-TABLET.COMPASS_RADIUS * 0.45, TABLET.COMPASS_RADIUS * 0.5);
+  context.closePath();
+  context.fill();
+  context.restore();
+  context.fillStyle = PALETTE.gaugeFace;
+  context.font = `bold ${TABLET.DISTANCE_LABEL_FONT_SIZE}px ${FONT_FAMILY}`;
+  context.textAlign = "center";
+  context.fillText(`FINISH ${distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)} m`}`, cx, cy + TABLET.COMPASS_RADIUS + 18);
+  context.textAlign = "left";
 }
 
 /**

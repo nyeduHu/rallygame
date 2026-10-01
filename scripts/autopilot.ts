@@ -4,7 +4,7 @@ import { GameSession } from "../lib/game/session";
 import { loadRapier } from "../lib/game/physics/rapier";
 import { clamp, lerp, smoothstep, wrapAngle } from "../lib/game/math";
 import { generateStage } from "../lib/game/stage/generateStage";
-import { buildRoadMesh, buildTerrainMesh } from "../lib/game/stage/meshData";
+import { buildNetworkRoadMesh, buildTerrainMesh } from "../lib/game/stage/meshData";
 import { poseAt } from "../lib/game/stage/roadIndex";
 import { getActiveTuning, setTuningEnabled, setTuningValue } from "../lib/game/tuning";
 import type { DriverControls } from "../lib/game/physics/vehicle";
@@ -66,7 +66,7 @@ function parseOptions(args: string[]): AutopilotOptions {
  */
 function runSeed(R: Awaited<ReturnType<typeof loadRapier>>, seed: number): RunResult {
   const stage = generateStage(seed);
-  const road = buildRoadMesh(stage.samples, seed);
+  const road = buildNetworkRoadMesh(stage);
   const terrain = buildTerrainMesh(stage.terrain, seed);
   const session = new GameSession(R, stage, road, terrain);
   let simulationSeconds = 0;

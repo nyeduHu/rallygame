@@ -52,6 +52,7 @@ export function RemoteDriver({ session, teamId }: RemoteDriverProps) {
       splits: [],
       finishTime: finished ? elapsed : null,
       progress: team?.progress01 ?? 0,
+      wrongWay: team?.wrongWay === true,
     });
     if (team) {
       const store = useGameStore.getState();

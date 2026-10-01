@@ -84,6 +84,7 @@ const INITIAL_RACE: RaceSnapshot = {
   splits: [],
   finishTime: null,
   progress: 0,
+  wrongWay: false,
 };
 
 /**

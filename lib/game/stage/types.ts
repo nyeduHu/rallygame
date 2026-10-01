@@ -6,7 +6,7 @@ export type SurfaceKind = "gravel" | "grass";
 
 export type CornerClassId = (typeof CORNER_CLASSES)[number]["id"];
 
-export type PaceCallKind = "corner" | "hairpin" | "straight" | "jump" | "caution" | "finish";
+export type PaceCallKind = "corner" | "hairpin" | "straight" | "jump" | "caution" | "finish" | "junction";
 export type PaceModifier = "tightens" | "opens" | "long" | "caution";
 
 /** A deterministic spoken instruction positioned along a generated stage. */
@@ -36,6 +36,22 @@ export interface RoadSample {
   s: number;
   /** Tangent is (sin heading, 0, cos heading); increasing heading turns left. */
   heading: number;
+}
+
+/** A side road leaving the reference route. */
+export interface RoadBranch {
+  id: number;
+  /** `alternative` rejoins the reference at `joinS`; `dead_end` ends in the forest. */
+  kind: "alternative" | "dead_end";
+  /** Arc length on the reference route where the branch leaves. */
+  forkS: number;
+  /** Arc length on the reference route where an alternative rejoins; null for dead ends. */
+  joinS: number | null;
+  /** Centreline from the fork outward (local arc length starting at 0). */
+  samples: RoadSample[];
+  corners: CornerInfo[];
+  /** Total length of the branch centreline. */
+  length: number;
 }
 
 /** Metadata for one generated corner; kept for barriers now and pace notes later. */
@@ -114,4 +130,6 @@ export interface StageData {
   spawn: RoadPose;
   /** Pit box, or null when the road has no suitable straight. */
   pit: PitInfo | null;
+  /** Side roads: alternative routes and dead ends (empty for a single road). */
+  branches: RoadBranch[];
 }

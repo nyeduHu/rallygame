@@ -2,7 +2,6 @@
 import { ROAD, TERRAIN } from "../constants";
 import { lerp, smoothstep } from "../math";
 import { fbm2D } from "../noise";
-import type { RoadIndex } from "./roadIndex";
 import type { RoadSample, TerrainData } from "./types";
 
 const TERRAIN_NOISE_OPTIONS = {
@@ -11,6 +10,11 @@ const TERRAIN_NOISE_OPTIONS = {
   persistence: TERRAIN.PERSISTENCE,
   lacunarity: TERRAIN.LACUNARITY,
 } as const;
+
+/** Anything that answers "nearest road point" (a single road or the whole network). */
+export interface RoadLookup {
+  nearest(x: number, z: number, maxDistance: number): { y: number; distance: number } | null;
+}
 
 /** Distance from centreline where the shoulder ends. */
 export const SHOULDER_EDGE = ROAD.WIDTH / 2 + ROAD.SHOULDER_WIDTH;
@@ -73,12 +77,12 @@ export function applyRoadElevation(samples: RoadSample[], seed: number): void {
  * Builds the heightfield. Near the road the terrain is pinned just below road
  * level (hidden by the ribbon and forming a shallow ditch), then blends out to
  * the natural landscape.
- * @param samples - Elevated centreline samples.
- * @param index - Spatial index over the samples.
+ * @param samples - Elevated centreline samples of every road (reference and branches), for the bounds.
+ * @param index - Nearest-road lookup over all roads.
  * @param seed - Terrain seed.
  * @returns Terrain data.
  */
-export function buildTerrain(samples: ReadonlyArray<RoadSample>, index: RoadIndex, seed: number): TerrainData {
+export function buildTerrain(samples: ReadonlyArray<RoadSample>, index: RoadLookup, seed: number): TerrainData {
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;

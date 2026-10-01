@@ -32,6 +32,7 @@ function makeStage(corners: CornerInfo[], startS = 0, finishS = 1000): StageData
     cones: [],
     spawn: { x: 0, y: 0, z: 0, heading: 0 },
   pit: null,
+  branches: [],
   };
 }
 

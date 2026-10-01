@@ -1,13 +1,15 @@
 // lib/game/stage/generateStage.ts
 import { PROPS, ROAD, VEHICLE } from "../constants";
 import { createRng, deriveSeed } from "../random";
-import { clearAroundArcs, gateHalfWidth, placeBarriers, placeCones, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
-import { RoadIndex, poseAt } from "./roadIndex";
+import { generateBranches, pinBranchElevation } from "./network";
+import { NetworkIndex } from "./networkIndex";
+import { clearAroundArcs, gateHalfWidth, placeBarriers, placeDeadEndBarriers, placeCones, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
+import { poseAt } from "./roadIndex";
 import { generateRoadLayout, hasEnoughCorners, type RoadLayout } from "./roadLayout";
 import { validateCandidate } from "./validateStage";
 import { clearPitArea, placePit } from "./pitStop";
 import { applyRoadElevation, buildTerrain } from "./terrain";
-import type { StageData } from "./types";
+import type { RoadBranch, StageData } from "./types";
 
 /** Salts separating the random streams of each pipeline pass. */
 const SALT = {
@@ -17,6 +19,7 @@ const SALT = {
   ROCKS: 4,
   GRASS: 5,
   STRUCTURES: 6,
+  NETWORK: 8,
 } as const;
 
 /**
@@ -51,11 +54,25 @@ function checkpointArcs(startS: number, finishS: number): number[] {
  * @param stageIndex - Stage number (0 = tutorial).
  * @returns Layout and the attempt number used.
  */
-export function findValidLayout(seed: number, stageIndex: number): { layout: RoadLayout; attempt: number } {
+export function findValidLayout(seed: number, stageIndex: number): { layout: RoadLayout; attempt: number; branches: RoadBranch[]; zones: Array<{ from: number; to: number }> } {
   for (let attempt = 0; attempt < ROAD.MAX_GENERATION_ATTEMPTS; attempt++) {
     const rng = createRng(deriveSeed(deriveSeed(seed, SALT.LAYOUT), attempt));
     const layout = generateRoadLayout(rng);
-    if (isValid(layout, stageIndex)) return { layout, attempt };
+    if (!isValid(layout, stageIndex)) continue;
+    const length = layout.samples[layout.samples.length - 1].s;
+    const startS = ROAD.START_LINE_OFFSET;
+    const finishS = length - ROAD.FINISH_LINE_OFFSET;
+    const network = generateBranches(
+      createRng(deriveSeed(deriveSeed(seed, SALT.NETWORK), attempt)),
+      layout,
+      startS,
+      finishS,
+      checkpointArcs(startS, finishS),
+    );
+    // The pit must also fit between the fork zones.
+    if (network && placePit(layout.samples, layout.corners, startS, finishS, network.zones)) {
+      return { layout, attempt, branches: network.branches, zones: network.zones };
+    }
   }
   throw new Error(`Road generation failed validation for seed ${seed} after ${ROAD.MAX_GENERATION_ATTEMPTS} attempts`);
 }
@@ -68,13 +85,17 @@ export function findValidLayout(seed: number, stageIndex: number): { layout: Roa
  * @returns Complete stage description.
  */
 export function generateStage(seed: number, stageIndex = 0): StageData {
-  const { layout, attempt } = findValidLayout(seed, stageIndex);
+  const { layout, attempt, branches, zones } = findValidLayout(seed, stageIndex);
   const samples = layout.samples;
   const terrainSeed = deriveSeed(seed, SALT.TERRAIN);
   applyRoadElevation(samples, terrainSeed);
+  for (const branch of branches) {
+    applyRoadElevation(branch.samples, terrainSeed);
+    pinBranchElevation(branch, samples);
+  }
 
-  const index = new RoadIndex(samples);
-  const terrain = buildTerrain(samples, index, terrainSeed);
+  const index = new NetworkIndex(samples, branches);
+  const terrain = buildTerrain([...samples, ...branches.flatMap((branch) => branch.samples)], index, terrainSeed);
   const length = samples[samples.length - 1].s;
 
   const startS = ROAD.START_LINE_OFFSET;
@@ -103,7 +124,7 @@ export function generateStage(seed: number, stageIndex = 0): StageData {
     gatePoints,
   });
 
-  const pit = placePit(samples, layout.corners, startS, finishS);
+  const pit = placePit(samples, layout.corners, startS, finishS, zones);
   const spawnPose = poseAt(samples, startS - VEHICLE.SPAWN_BEHIND_START);
 
   return {
@@ -119,9 +140,10 @@ export function generateStage(seed: number, stageIndex = 0): StageData {
     trees: clearAroundArcs(clearPitArea(scatterTrees(contextFor(SALT.TREES)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
     rocks: clearAroundArcs(clearPitArea(scatterRocks(contextFor(SALT.ROCKS)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
     grass: clearAroundArcs(clearPitArea(scatterGrass(contextFor(SALT.GRASS)), pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START),
-    barriers: clearPitArea(placeBarriers(contextFor(SALT.STRUCTURES), layout.corners), pit),
+    barriers: [...clearPitArea(placeBarriers(contextFor(SALT.STRUCTURES), layout.corners), pit), ...placeDeadEndBarriers(branches, terrain)],
     cones: clearPitArea(placeCones(contextFor(SALT.STRUCTURES), layout.corners), pit),
     spawn: spawnPose,
     pit,
+    branches,
   };
 }

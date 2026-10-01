@@ -6,7 +6,7 @@ import { valueNoise2D } from "../noise";
 import { deriveSeed } from "../random";
 import { leftVector } from "./roadIndex";
 import { SHOULDER_EDGE } from "./terrain";
-import type { RoadSample, TerrainData } from "./types";
+import type { RoadSample, StageData, TerrainData } from "./types";
 
 /**
  * Engine-agnostic triangle mesh. The same arrays feed the three.js geometry and
@@ -74,6 +74,40 @@ export function buildRoadMesh(samples: ReadonlyArray<RoadSample>, seed: number):
       indices.set([a, b, c, b, d, c], k);
       k += 6;
     }
+  }
+  return { positions, indices, colors };
+}
+
+/** Side roads sit this far above the main road so overlapping ribbons never z-fight. */
+const BRANCH_LIFT = 0.012;
+
+/**
+ * Builds one road mesh for the whole network: the reference route plus every branch.
+ * @param stage - Stage with elevated samples and branches.
+ * @returns Merged mesh arrays (also used for the physics collider).
+ */
+export function buildNetworkRoadMesh(stage: Pick<StageData, "samples" | "branches" | "seed">): MeshData {
+  const parts = [
+    buildRoadMesh(stage.samples, stage.seed),
+    ...stage.branches.map((branch) => {
+      const part = buildRoadMesh(branch.samples, stage.seed + branch.id);
+      for (let i = 1; i < part.positions.length; i += COMPONENTS) part.positions[i] += BRANCH_LIFT;
+      return part;
+    }),
+  ];
+  if (parts.length === 1) return parts[0];
+  const positions = new Float32Array(parts.reduce((sum, part) => sum + part.positions.length, 0));
+  const colors = new Float32Array(positions.length);
+  const indices = new Uint32Array(parts.reduce((sum, part) => sum + part.indices.length, 0));
+  let positionOffset = 0;
+  let indexOffset = 0;
+  for (const part of parts) {
+    positions.set(part.positions, positionOffset);
+    colors.set(part.colors, positionOffset);
+    const vertexBase = positionOffset / COMPONENTS;
+    for (let i = 0; i < part.indices.length; i++) indices[indexOffset + i] = part.indices[i] + vertexBase;
+    positionOffset += part.positions.length;
+    indexOffset += part.indices.length;
   }
   return { positions, indices, colors };
 }

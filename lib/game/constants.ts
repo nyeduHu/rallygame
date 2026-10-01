@@ -208,6 +208,13 @@ export const TABLET = {
   DEGREES_PER_RADIAN: 180 / Math.PI,
   HEADER_HEIGHT: 36,
   PROJECTION_SEARCH_RADIUS: 250,
+  /** The co-driver sees road within this distance of the car (fog of war beyond it). */
+  REVEAL_RADIUS_M: 150,
+  /** Chevron every this many samples along revealed road. */
+  ARROW_SAMPLE_INTERVAL: 75,
+  FINISH_DISTANCE_STEP_M: 10,
+  COMPASS_RADIUS: 30,
+  COMPASS_MARGIN: 64,
   SCREEN_SIZE: [0.54, 0.32, 0.025] as const,
   BODY_SIZE: [0.59, 0.37, 0.055] as const,
   BODY_POSITION: [0, 0, 0] as const,
@@ -716,4 +723,44 @@ export const FX = {
   SHAKE_FREQUENCY_HZ: 24,
   SMOKE_WHITE: "#e6e8ec",
   SMOKE_BLACK: "#1c1d21",
+} as const;
+
+/** Road network (alternative routes and dead ends). */
+export const NETWORK = {
+  /** Metres into a dead end before it counts as a wrong turn. */
+  WRONG_WAY_GRACE_M: 60,
+  /** Time penalty for confirming a wrong turn. */
+  WRONG_WAY_PENALTY_S: 8,
+  /** Number of forks to try to place per stage. */
+  FORK_COUNT: 3,
+  /** Alternative routes among the forks (the rest are dead ends). */
+  ALTERNATIVE_COUNT: 2,
+  /** Alternatives span this much of the reference route (fork to join). */
+  ALT_SPAN_MIN: 260,
+  ALT_SPAN_MAX: 520,
+  /** Angle at which a side road leaves the main road. */
+  FORK_ANGLE_MIN: 30 * DEG_TO_RAD,
+  FORK_ANGLE_MAX: 55 * DEG_TO_RAD,
+  /** Bezier handle length as a fraction of the fork-to-join chord. */
+  HANDLE_MIN: 0.45,
+  HANDLE_MAX: 0.8,
+  DEAD_END_MIN: 220,
+  DEAD_END_MAX: 480,
+  /** A fork or join needs this much straight road on either side. */
+  FORK_CORNER_CLEARANCE_M: 22,
+  /** Forks keep this far from gates (their zones may not contain a gate). */
+  FORK_GATE_CLEARANCE_M: 60,
+  /** Padding added around a fork zone (pit and later forks keep out of it). */
+  FORK_ZONE_PAD_M: 30,
+  FORK_EDGE_CLEARANCE_M: 160,
+  /** Minimum spacing between fork zones. */
+  FORK_SPACING_M: 120,
+  /** Branch samples this close (along the branch) to either end may touch the main road. */
+  JUNCTION_ZONE_M: 90,
+  /** A branch must keep at least this radius so it is drivable. */
+  BRANCH_MIN_RADIUS: 18,
+  /** Curvature (1/m) above which a stretch of an alternative counts as a corner. */
+  CORNER_CURVATURE: 1 / 260,
+  /** Corner gaps shorter than this many samples merge into one corner. */
+  CORNER_MERGE_SAMPLES: 5,
 } as const;

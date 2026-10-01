@@ -1,6 +1,7 @@
 // lib/game/stage/paceNotes.ts
 import { PACE_NOTES } from "../constants";
-import type { CornerInfo, PaceModifier, PaceNote, StageData } from "./types";
+import { leftVector, poseAt } from "./roadIndex";
+import type { CornerInfo, PaceModifier, PaceNote, RoadBranch, RoadSample, StageData } from "./types";
 
 interface PositionedCorner {
   corner: CornerInfo;
@@ -33,12 +34,31 @@ export function severityForRadius(radius: number): 1 | 2 | 3 | 4 {
   return PACE_NOTES.SEVERITY_BANDS[PACE_NOTES.SEVERITY_BANDS.length - 1].severity;
 }
 
+/** A junction call: a side road leaves (or joins) on one side of the road. */
+export interface JunctionCall {
+  atS: number;
+  /** Side the other road is on: 1 = left, -1 = right. */
+  direction: 1 | -1;
+  /** "Junction" where a road leaves, "Joins" where one merges in. */
+  label: "Junction" | "Joins";
+}
+
+/** Extra calls and a custom last call for notes along a side road. */
+export interface PaceNoteOptions {
+  junctions?: ReadonlyArray<JunctionCall>;
+  /** Spoken text of the last call (default "finish"). */
+  endText?: string;
+}
+
 /**
  * Converts generated corner data into deterministic, positioned co-driver calls.
  * @param stage - Generated stage data.
  * @returns Ordered pace calls, including the opening straight and finish.
  */
-export function generatePaceNotes(stage: Pick<StageData, "corners" | "startS" | "finishS">): PaceNote[] {
+export function generatePaceNotes(
+  stage: Pick<StageData, "corners" | "startS" | "finishS">,
+  options: PaceNoteOptions = {},
+): PaceNote[] {
   const corners = stage.corners
     .map((corner, cornerIndex): PositionedCorner => {
       const isHairpin = corner.classId === "hairpin";
@@ -104,6 +124,19 @@ export function generatePaceNotes(stage: Pick<StageData, "corners" | "startS" | 
     });
   });
 
+  for (const junction of options.junctions ?? []) {
+    drafts.push({
+      atS: junction.atS,
+      kind: "junction",
+      direction: junction.direction,
+      severity: 0,
+      modifiers: [],
+      cornerIndex: -1,
+      distanceToNext: 0,
+      text: junction.label,
+    });
+  }
+
   drafts.push({
     atS: stage.finishS,
     kind: "finish",
@@ -112,7 +145,7 @@ export function generatePaceNotes(stage: Pick<StageData, "corners" | "startS" | 
     modifiers: [],
     cornerIndex: -1,
     distanceToNext: 0,
-    text: "finish",
+    text: options.endText ?? "finish",
   });
 
   drafts.sort((first, second) => first.atS - second.atS);
@@ -128,6 +161,8 @@ export function generatePaceNotes(stage: Pick<StageData, "corners" | "startS" | 
 
     if (draft.kind === "straight") {
       draft.text = `Straight, ${textDistance}`;
+    } else if (draft.kind === "junction") {
+      draft.text = `${draft.text} ${draft.direction === 1 ? "left" : "right"}, ${textDistance}`;
     } else {
       draft.text = formatCornerText(draft, textDistance);
     }
@@ -167,4 +202,47 @@ function formatCornerText(note: NoteDraft, distanceText: string): string {
   const call = note.kind === "hairpin" ? `Hairpin ${direction.toLowerCase()}` : `${direction} ${note.severity}`;
   const modifiers = note.modifiers.length > 0 ? `, ${note.modifiers.join(", ")}` : "";
   return `${call}${modifiers}, ${distanceText}`;
+}
+
+/**
+ * Notes for the reference route including a junction call wherever a side road leaves or joins.
+ * @param stage - Generated stage.
+ * @returns Notes for the main route.
+ */
+export function generateRouteNotes(stage: Pick<StageData, "corners" | "startS" | "finishS" | "samples" | "branches">): PaceNote[] {
+  const junctions: JunctionCall[] = [];
+  for (const branch of stage.branches) {
+    const leaving = sideOf(stage.samples, branch, "fork");
+    junctions.push({ atS: branch.forkS, direction: leaving, label: "Junction" });
+    if (branch.joinS !== null) junctions.push({ atS: branch.joinS, direction: sideOf(stage.samples, branch, "join"), label: "Joins" });
+  }
+  return generatePaceNotes(stage, { junctions });
+}
+
+/**
+ * Notes for driving along a side road: its own corners, ending with "joins main road" or
+ * "road ends".
+ * @param branch - The side road.
+ * @returns Notes along the branch (local arc length).
+ */
+export function generateBranchNotes(branch: RoadBranch): PaceNote[] {
+  return generatePaceNotes(
+    { corners: branch.corners, startS: 0, finishS: branch.length },
+    { endText: branch.kind === "alternative" ? "joins main road" : "road ends" },
+  );
+}
+
+/**
+ * Which side of the main road a branch is on at its fork or join.
+ * @param samples - Reference samples.
+ * @param branch - The branch.
+ * @param end - Fork or join end.
+ * @returns 1 = left, -1 = right.
+ */
+function sideOf(samples: ReadonlyArray<RoadSample>, branch: RoadBranch, end: "fork" | "join"): 1 | -1 {
+  const s = end === "fork" ? branch.forkS : (branch.joinS ?? branch.forkS);
+  const pose = poseAt(samples, s);
+  const point = end === "fork" ? branch.samples[Math.min(15, branch.samples.length - 1)] : branch.samples[Math.max(0, branch.samples.length - 16)];
+  const [lx, lz] = leftVector(pose.heading);
+  return (point.x - pose.x) * lx + (point.z - pose.z) * lz >= 0 ? 1 : -1;
 }

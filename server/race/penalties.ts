@@ -1,6 +1,6 @@
 // server/race/penalties.ts
 import { navMistakeSeconds, PENALTY } from "../../lib/game/race/penalties";
-import { ROAD } from "../../lib/game/constants";
+import { NETWORK, ROAD } from "../../lib/game/constants";
 import type { CornerInfo } from "../../lib/game/stage/types";
 
 const MS_PER_SECOND = 1000;
@@ -12,6 +12,8 @@ export class PenaltyLedger {
   navErrors = 0;
   crashes = 0;
   smallMistakes = 0;
+  wrongTurns = 0;
+  private onWrongTurn = false;
   private offRoadSeconds = 0;
   private lastNavAtMs = Number.NEGATIVE_INFINITY;
   private readonly hitCones = new Set<number>();
@@ -62,6 +64,24 @@ export class PenaltyLedger {
     const added = this.add(navMistakeSeconds(this.offRoadSeconds));
     this.offRoadSeconds = 0;
     return added;
+  }
+
+  /**
+   * Tracks time spent far into a dead-end road; charges one navigation mistake per visit.
+   * @param deadEndDistance - Metres driven into a dead end (0 when not on one).
+   * @returns Penalty added in milliseconds (0 unless a wrong turn was just confirmed).
+   */
+  trackDeadEnd(deadEndDistance: number): number {
+    if (deadEndDistance <= NETWORK.WRONG_WAY_GRACE_M) {
+      // Back near the junction: the next excursion counts as a new wrong turn.
+      if (deadEndDistance < NETWORK.WRONG_WAY_GRACE_M / 2) this.onWrongTurn = false;
+      return 0;
+    }
+    if (this.onWrongTurn) return 0;
+    this.onWrongTurn = true;
+    this.wrongTurns += 1;
+    this.navErrors += 1;
+    return this.add(NETWORK.WRONG_WAY_PENALTY_S);
   }
 
   /**

@@ -113,6 +113,42 @@ export function generateRoadLayout(rng: Rng): RoadLayout {
 }
 
 /**
+ * Lays out a short side road starting at a given pose, using the same straights and corners as
+ * the main route.
+ * @param rng - Seeded generator.
+ * @param start - Start position and heading.
+ * @param length - Approximate length in metres.
+ * @returns Flat layout with local arc length starting at 0.
+ */
+export function generateSpurLayout(
+  rng: Rng,
+  start: { x: number; z: number; heading: number },
+  length: number,
+): RoadLayout {
+  const cursor: LayoutCursor = {
+    x: start.x,
+    z: start.z,
+    heading: start.heading,
+    s: 0,
+    samples: [{ x: start.x, y: 0, z: start.z, s: 0, heading: start.heading }],
+  };
+  const corners: CornerInfo[] = [];
+  appendStraight(cursor, rng.range(ROAD.STRAIGHT_MIN, ROAD.STRAIGHT_MAX / 2));
+  while (cursor.s < length) {
+    // Spurs are gentler than the main stage: no hairpins.
+    const cornerClass = rng.weighted(CORNER_CLASSES.filter((c) => c.id !== "hairpin"));
+    const radius = rng.range(cornerClass.radiusMin, cornerClass.radiusMax);
+    const angle = rng.range(cornerClass.angleMin, cornerClass.angleMax);
+    const direction: 1 | -1 = rng.sign() > 0 ? 1 : -1;
+    const startS = cursor.s;
+    appendArc(cursor, radius, angle, direction);
+    corners.push({ startS, endS: cursor.s, apexS: (startS + cursor.s) / 2, radius, angle, direction, classId: cornerClass.id });
+    appendStraight(cursor, rng.range(ROAD.STRAIGHT_MIN, ROAD.STRAIGHT_MAX));
+  }
+  return { samples: cursor.samples, corners };
+}
+
+/**
  * Minimum corner variety (the separation and other fairness checks live in `validateStage`).
  * @param layout - Candidate layout.
  * @returns True when there are enough corners and at least one severe one.

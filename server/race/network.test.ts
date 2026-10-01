@@ -1,0 +1,77 @@
+// server/race/network.test.ts
+import { describe, expect, it } from "vitest";
+import { NETWORK } from "../../lib/game/constants";
+import { generateStage } from "../../lib/game/stage/generateStage";
+import { poseAt } from "../../lib/game/stage/roadIndex";
+import type { PoseReport, RaceEvent, RoomResults, WorldSnapshot } from "../../lib/net/protocol";
+import { Room } from "../rooms/room";
+import { RaceController } from "./raceController";
+
+const STAGE = generateStage(3);
+const HOP_M = 4;
+
+/** Pose report at a world position. */
+function pose(seq: number, x: number, y: number, z: number): PoseReport {
+  return { seq, epoch: 0, clientTimeMs: 0, p: [x, y, z], q: [0, 0, 0, 1], v: [0, 0, 0], steer: 0, wheelSpin: 0, susp: [0, 0, 0, 0] };
+}
+
+describe("race on a road network", () => {
+  it("an alternative route finishes the stage, and a dead end costs one wrong-turn penalty", () => {
+    const room = new Room("ABCDEF", "Host", { seed: 3 });
+    const guest = room.addPlayer("Guest");
+    const team = room.createTeam("T");
+    room.joinTeam(room.hostId, team.id, "driver");
+    room.joinTeam(guest.id, team.id, "codriver");
+    const clock = { now: 0 };
+    const events: RaceEvent[] = [];
+    const results: RoomResults[] = [];
+    const snapshots: WorldSnapshot[] = [];
+    const controller = new RaceController(
+      room,
+      { countdown() {}, snapshot: (s) => snapshots.push(s), event: (e) => events.push(e), results: (r) => results.push(r) },
+      () => clock.now,
+    );
+    controller.start();
+    clock.now = 5000;
+
+    const alternative = STAGE.branches.find((branch) => branch.kind === "alternative");
+    const deadEnd = STAGE.branches.find((branch) => branch.kind === "dead_end");
+    if (!alternative || !deadEnd || alternative.joinS === null) throw new Error("expected both kinds of branch");
+
+    let seq = 1;
+    /** Reports the car at a position and advances the clock. */
+    const at = (x: number, y: number, z: number): void => {
+      clock.now += 50;
+      controller.reportPose(team.id, pose(seq++, x, y, z));
+      controller.tick();
+    };
+    /** Drives the reference route between two arc lengths. */
+    const driveReference = (from: number, to: number): void => {
+      for (let s = from; s <= to; s += HOP_M) {
+        const p = poseAt(STAGE.samples, s);
+        at(p.x, p.y, p.z);
+      }
+    };
+
+    // Start, then the dead end first: drive in past the grace distance and back out.
+    driveReference(STAGE.startS - 5, deadEnd.forkS);
+    const into = deadEnd.samples.filter((sample) => sample.s <= NETWORK.WRONG_WAY_GRACE_M + 40);
+    for (let i = 0; i < into.length; i += 2) at(into[i].x, into[i].y, into[i].z);
+    expect(snapshots[snapshots.length - 1].teams[0].wrongWay).toBe(true);
+    for (let i = into.length - 1; i >= 0; i -= 2) at(into[i].x, into[i].y, into[i].z);
+    const afterDeadEnd = controller.penaltyMsOf(team.id);
+    expect(afterDeadEnd).toBe(NETWORK.WRONG_WAY_PENALTY_S * 1000);
+
+    // Continue on the reference to just before the alternative, then take it instead.
+    driveReference(deadEnd.forkS, alternative.forkS);
+    for (let i = 0; i < alternative.samples.length; i += 2) {
+      const sample = alternative.samples[i];
+      at(sample.x, sample.y, sample.z);
+    }
+    driveReference(alternative.joinS, STAGE.finishS + 10);
+    const entry = results[0]?.results[0];
+    expect(entry?.status).toBe("finished");
+    expect(entry?.navErrors).toBe(1);
+    expect(entry?.penaltyMs).toBe(afterDeadEnd);
+  });
+});

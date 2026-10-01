@@ -211,6 +211,7 @@ export const teamSnapshotSchema = z.object({
   repair: repairViewSchema.optional(),
   refuel: refuelViewSchema.optional(),
   pitReady: z.boolean().optional(),
+  wrongWay: z.boolean().optional(),
   hoodOpen: z.boolean().optional(),
   occupancy: z.object({ driver: seatStateSchema, codriver: seatStateSchema }).strict().optional(),
 }).strict();

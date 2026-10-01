@@ -3,7 +3,7 @@ import { PIT, ROAD } from "../constants";
 import { poseAt } from "./roadIndex";
 import type { CornerInfo, PitInfo, PropPlacement, RoadSample } from "./types";
 
-interface Interval {
+export interface Interval {
   from: number;
   to: number;
 }
@@ -18,6 +18,7 @@ const ROAD_EDGE = ROAD.WIDTH / 2 + ROAD.SHOULDER_WIDTH;
  * @param bandFrom - Band start (arc length).
  * @param bandTo - Band end (arc length).
  * @param clearance - Required distance from corners.
+ * @param avoid - Extra blocked intervals (fork zones).
  * @returns Candidate intervals sorted by length, descending.
  */
 function straightCandidates(
@@ -25,9 +26,11 @@ function straightCandidates(
   bandFrom: number,
   bandTo: number,
   clearance: number = PIT.MIN_CLEARANCE_FROM_CORNER_M,
+  avoid: ReadonlyArray<Interval> = [],
 ): Interval[] {
   const blocked: Interval[] = corners
     .map((corner) => ({ from: corner.startS - clearance, to: corner.endS + clearance }))
+    .concat(avoid)
     .sort((a, b) => a.from - b.from);
   const free: Interval[] = [];
   let cursor = bandFrom;
@@ -48,6 +51,7 @@ function straightCandidates(
  * @param corners - Stage corners.
  * @param startS - Start line arc length.
  * @param finishS - Finish line arc length.
+ * @param avoid - Reference intervals the pit must not touch (fork zones).
  * @returns The pit, or null when no straight is long enough.
  */
 export function placePit(
@@ -55,14 +59,15 @@ export function placePit(
   corners: ReadonlyArray<CornerInfo>,
   startS: number,
   finishS: number,
+  avoid: ReadonlyArray<Interval> = [],
 ): PitInfo | null {
   const span = finishS - startS;
   const bandFrom = startS + span * PIT.BAND_START;
   const bandTo = startS + span * PIT.BAND_END;
-  const preferred = straightCandidates(corners, bandFrom, bandTo)[0];
+  const preferred = straightCandidates(corners, bandFrom, bandTo, PIT.MIN_CLEARANCE_FROM_CORNER_M, avoid)[0];
   // Generated roads rarely have a 120 m + 2 x 60 m clear straight in the band, so fall back to the
   // longest raw gap between corners, as long as the box keeps a minimum clearance.
-  const fallback = straightCandidates(corners, bandFrom, bandTo, 0)[0];
+  const fallback = straightCandidates(corners, bandFrom, bandTo, 0, avoid)[0];
   const full = preferred && preferred.to - preferred.from >= Math.max(PIT.MIN_STRAIGHT_METRES, PIT.BOX_SIZE.z);
   const best = full ? preferred : fallback;
   if (!best) return null;

@@ -1,7 +1,7 @@
 // lib/game/race/raceTracker.ts
-import { GATES, SIMULATION, VEHICLE } from "../constants";
+import { GATES, NETWORK, SIMULATION, VEHICLE } from "../constants";
 import { stepCheckpoints } from "./checkpointLogic";
-import { RoadIndex } from "../stage/roadIndex";
+import { NetworkIndex } from "../stage/networkIndex";
 import type { StageData } from "../stage/types";
 
 export type RacePhase = "ready" | "countdown" | "running" | "finished";
@@ -18,6 +18,8 @@ export interface RaceSnapshot {
   finishTime: number | null;
   /** 0..1 along the stage. */
   progress: number;
+  /** True while the car is far enough into a dead-end road to be on a wrong turn. */
+  wrongWay: boolean;
 }
 
 /** How far from the road the car may be and still be tracked. */
@@ -36,13 +38,14 @@ export class RaceTracker {
   private splits: number[] = [];
   private finishTime: number | null = null;
   private progressS: number;
-  private readonly index: RoadIndex;
+  private deadEndDistance = 0;
+  private readonly index: NetworkIndex;
 
   /**
    * @param stage - Generated stage.
    */
   constructor(private readonly stage: StageData) {
-    this.index = new RoadIndex(stage.samples);
+    this.index = new NetworkIndex(stage.samples, stage.branches);
     this.progressS = stage.startS - VEHICLE.SPAWN_BEHIND_START;
   }
 
@@ -55,6 +58,7 @@ export class RaceTracker {
     this.splits = [];
     this.finishTime = null;
     this.progressS = this.stage.startS - VEHICLE.SPAWN_BEHIND_START;
+    this.deadEndDistance = 0;
   }
 
   /** Starts the 3-2-1 countdown (from the ready state only). */
@@ -134,6 +138,7 @@ export class RaceTracker {
     this.elapsed += dt;
     const projection = this.index.nearest(x, z, TRACKING_RADIUS);
     if (!projection) return;
+    this.deadEndDistance = projection.deadEndDistance;
     const result = stepCheckpoints(
       { progressS: this.progressS, nextCheckpoint: this.nextCheckpoint, finished: false },
       projection.s,
@@ -163,6 +168,7 @@ export class RaceTracker {
       splits: this.splits,
       finishTime: this.finishTime,
       progress: Math.min(1, Math.max(0, (this.progressS - this.stage.startS) / span)),
+      wrongWay: this.deadEndDistance > NETWORK.WRONG_WAY_GRACE_M,
     };
   }
 }

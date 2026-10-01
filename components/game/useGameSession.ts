@@ -8,7 +8,7 @@ import { RemoteSession } from "@/lib/game/remoteSession";
 import type { SessionView } from "@/lib/game/sessionView";
 import { generateStage } from "@/lib/game/stage/generateStage";
 import { useGameStore } from "@/lib/game/store";
-import { buildRoadMesh, buildTerrainMesh, type MeshData } from "@/lib/game/stage/meshData";
+import { buildNetworkRoadMesh, buildTerrainMesh, type MeshData } from "@/lib/game/stage/meshData";
 
 interface GameSessionState {
   session: SessionView | null;
@@ -26,7 +26,7 @@ interface GameSessionState {
  */
 export function useGameSession(seed: number, remote = false): GameSessionState {
   const stage = useMemo(() => generateStage(seed), [seed]);
-  const road = useMemo(() => buildRoadMesh(stage.samples, stage.seed), [stage]);
+  const road = useMemo(() => buildNetworkRoadMesh(stage), [stage]);
   const terrain = useMemo(() => buildTerrainMesh(stage.terrain, stage.seed), [stage]);
   const remoteSession = useMemo(() => (remote ? new RemoteSession(stage) : null), [remote, stage]);
   const [session, setSession] = useState<SessionView | null>(null);
