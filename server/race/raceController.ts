@@ -205,21 +205,21 @@ export class RaceController {
   }
 
   /**
-   * Applies a driver repair step if the driver is in the right place and the machine accepts it.
+   * Applies a repair step if the teammate is in the right place and the machine accepts it.
    * @param teamId - Team.
-   * @param role - Player's role (only the driver repairs).
+   * @param role - Player's role (driver or co-driver can repair).
    * @param request - Requested step.
    * @returns Null when accepted, otherwise an error code.
    */
   repairStep(teamId: string, role: Role, request: RepairStepPayload): string | null {
     const team = this.teams.get(teamId);
-    if (!team || role !== "driver" || (team.status !== "racing" && team.status !== "pit")) return "not_allowed";
+    if (!team || (team.status !== "racing" && team.status !== "pit")) return "not_allowed";
     const car = team.lastPose?.report;
-    const foot = team.foot.driver?.report;
+    const foot = team.foot[role]?.report;
     if (request.step === "IGNITION") {
-      if (team.occupancy.driver !== "seat") return "not_in_seat";
+      if (team.occupancy[role] !== "seat") return "not_in_seat";
     } else {
-      if (team.occupancy.driver !== "foot" || !car || !foot) return "not_on_foot";
+      if (team.occupancy[role] !== "foot" || !car || !foot) return "not_on_foot";
       if (Math.hypot(foot.p[0] - car.p[0], foot.p[2] - car.p[2]) > REPAIR.MAX_DISTANCE_M) return "too_far";
     }
     const result = applyStep(team.repair, request, { engineStatus: team.mech.engineStatus, brokenPart: team.mech.brokenPart });

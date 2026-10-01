@@ -567,12 +567,7 @@ export const REPAIR = {
   WRONG_PART_SECONDS: 5,
   /** Engine health restored by a completed repair. */
   RESTORED_HEALTH: 0.6,
-  CAP_TURNS: 1.5,
-  /** Pointer drag that counts as one turn of the radiator cap. */
-  CAP_PX_PER_TURN: 160,
   HOOD_HOLD_S: 0.8,
-  REMOVE_DRAG_PX: 120,
-  INSTALL_DRAG_PX: 90,
   WATER_HOLD_S: 3,
   /** Cooling with water drops the temperature to this level. */
   COOLED_TEMPERATURE: 0.4,

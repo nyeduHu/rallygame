@@ -12,20 +12,19 @@ import { Interactable } from "../interaction/Interactable";
 import { submitRepairStep } from "./submitRepairStep";
 
 const BAY = COCKPIT.ENGINE_BAY;
+const BOTH_ROLES = ["driver", "codriver"] as const;
 const TINT_BROKEN = "#e2462f";
 const PART_COLOR = "#7d828c";
-/** Drags shorter than this count as a click (inspect). */
-const CLICK_MAX_DRAG_PX = 8;
 const PART_LABELS: Record<BrokenPart, string> = {
   radiator_hose: "Radiator hose",
   spark_plug: "Spark plugs",
   drive_belt: "Drive belt",
 };
 
-/** @returns True while the driver can work on the engine (hood open, standing outside). */
+/** @returns True while someone can work on the engine (hood open, standing outside). */
 function canWork(): boolean {
   const store = useGameStore.getState();
-  return store.footRole === "driver" && store.hoodOpen;
+  return store.footRole !== null && store.hoodOpen;
 }
 
 /**
@@ -39,46 +38,35 @@ function installed(part: BrokenPart): boolean {
 }
 
 /**
- * Builds the interaction for an installed part: a click inspects it, a long drag removes it.
+ * Builds the interaction for an installed part: press to inspect it, or, once the wrench is in
+ * hand, press to take it out.
  * @param part - Part id.
  * @returns Interactable spec.
  */
 function installedSpec(part: BrokenPart): InteractableSpec {
-  let totalDx = 0;
-  let totalDy = 0;
   return {
     id: `part-${part}`,
-    kind: "drag",
-    roles: ["driver"],
+    kind: "press",
+    roles: BOTH_ROLES,
     isEnabled: () => canWork() && installed(part),
     label: PART_LABELS[part],
     getObjects: () => [],
     onPress: () => {
-      totalDx = 0;
-      totalDy = 0;
-    },
-    onDrag: (_dx, _dy, tx, ty) => {
-      totalDx = tx;
-      totalDy = ty;
-    },
-    onRelease: () => {
-      const dragged = Math.hypot(totalDx, totalDy);
-      if (dragged <= CLICK_MAX_DRAG_PX) submitRepairStep({ step: "INSPECT", partId: part });
-      else if (dragged >= REPAIR.REMOVE_DRAG_PX) submitRepairStep({ step: "REMOVE_PART", partId: part });
+      const { repair } = useGameStore.getState();
+      submitRepairStep({ step: repair.kind === "tool_in_hand" ? "REMOVE_PART" : "INSPECT", partId: part });
     },
   };
 }
 
 /**
- * Radiator cap: drag to unscrew (hood open) or screw back (after water), 1.5 turns each way.
+ * Radiator cap: press to unscrew it (hood open) or screw it back on (after water).
  * @returns Interactable spec.
  */
 function capSpec(): InteractableSpec {
-  let total = 0;
   return {
     id: "radiator-cap",
-    kind: "drag",
-    roles: ["driver"],
+    kind: "press",
+    roles: BOTH_ROLES,
     isEnabled: () => {
       const { repair } = useGameStore.getState();
       return canWork() && (repair.kind === "hood_open" || repair.kind === "cap_watered");
@@ -86,13 +74,6 @@ function capSpec(): InteractableSpec {
     label: "Radiator cap",
     getObjects: () => [],
     onPress: () => {
-      total = 0;
-    },
-    onDrag: (_dx, _dy, tx, ty) => {
-      total = Math.hypot(tx, ty);
-    },
-    onRelease: () => {
-      if (total < REPAIR.CAP_TURNS * REPAIR.CAP_PX_PER_TURN) return;
       const { repair } = useGameStore.getState();
       submitRepairStep({ step: repair.kind === "cap_watered" ? "SCREW_CAP" : "UNSCREW_CAP" });
     },
@@ -108,8 +89,8 @@ function waterSpec(): InteractableSpec {
   return {
     id: "water-bottle",
     kind: "hold",
-    roles: ["driver"],
-    isEnabled: () => useGameStore.getState().footRole === "driver" && useGameStore.getState().repair.kind === "cap_off",
+    roles: BOTH_ROLES,
+    isEnabled: () => useGameStore.getState().footRole !== null && useGameStore.getState().repair.kind === "cap_off",
     label: "Pour water (hold)",
     getObjects: () => [],
     onPress: () => {
@@ -124,28 +105,20 @@ function waterSpec(): InteractableSpec {
 }
 
 /**
- * Builds the interaction for a spare in the toolbox area: drag it toward the engine to install.
+ * Builds the interaction for a spare in the toolbox area: press to fit it (only the matching
+ * part works).
  * @param part - Part id of the spare.
  * @returns Interactable spec.
  */
 function spareSpec(part: BrokenPart): InteractableSpec {
-  let total = 0;
   return {
     id: `spare-${part}`,
-    kind: "drag",
-    roles: ["driver"],
-    isEnabled: () => useGameStore.getState().footRole === "driver",
-    label: `Spare ${PART_LABELS[part].toLowerCase()}`,
+    kind: "press",
+    roles: BOTH_ROLES,
+    isEnabled: () => useGameStore.getState().footRole !== null,
+    label: `Fit spare ${PART_LABELS[part].toLowerCase()}`,
     getObjects: () => [],
-    onPress: () => {
-      total = 0;
-    },
-    onDrag: (_dx, _dy, tx, ty) => {
-      total = Math.hypot(tx, ty);
-    },
-    onRelease: () => {
-      if (total >= REPAIR.INSTALL_DRAG_PX) submitRepairStep({ step: "INSTALL_NEW", partId: part });
-    },
+    onPress: () => submitRepairStep({ step: "INSTALL_NEW", partId: part }),
   };
 }
 
@@ -194,8 +167,8 @@ export function RepairParts() {
     () => ({
       id: "toolbox-tool",
       kind: "press",
-      roles: ["driver"],
-      isEnabled: () => useGameStore.getState().footRole === "driver",
+      roles: BOTH_ROLES,
+      isEnabled: () => useGameStore.getState().footRole !== null,
       label: "Grab wrench",
       getObjects: () => [],
       onPress: () => submitRepairStep({ step: "GRAB_TOOL" }),
@@ -206,7 +179,7 @@ export function RepairParts() {
     () => ({
       id: "ignition",
       kind: "press",
-      roles: ["driver"],
+      roles: BOTH_ROLES,
       isEnabled: () => useGameStore.getState().footRole === null,
       label: "Ignition",
       getObjects: () => [],
@@ -215,7 +188,7 @@ export function RepairParts() {
     [],
   );
 
-  const driverOut = useGameStore((state) => state.footRole === "driver");
+  const driverOut = useGameStore((state) => state.footRole !== null);
   const hoodOpen = useGameStore((state) => state.hoodOpen);
 
   const spareSlot = (index: number): [number, number, number] => [

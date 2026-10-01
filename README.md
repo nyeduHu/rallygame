@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Online multiplayer
+
+Online rooms need the game server (Socket.IO on port 4000) running next to the web app:
+
+```bash
+npm run dev:all   # web app on :3000 and server on :4000
+```
+
+Then open `/rally` to create a rally or join one with a room code. Copy `.env.example` if you need different ports or origins.
