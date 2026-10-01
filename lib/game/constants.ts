@@ -209,7 +209,7 @@ export const TABLET = {
   HEADER_HEIGHT: 36,
   PROJECTION_SEARCH_RADIUS: 250,
   /** The co-driver sees road within this distance of the car (fog of war beyond it). */
-  REVEAL_RADIUS_M: 150,
+  REVEAL_RADIUS_M: 250,
   /** Chevron every this many samples along revealed road. */
   ARROW_SAMPLE_INTERVAL: 75,
   FINISH_DISTANCE_STEP_M: 10,
