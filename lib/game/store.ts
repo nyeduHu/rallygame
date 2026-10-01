@@ -1,0 +1,73 @@
+// lib/game/store.ts
+import { create } from "zustand";
+import type { RaceSnapshot } from "./race/raceTracker";
+import type { SurfaceKind } from "./stage/types";
+import type { Role } from "./roles";
+import type { Vector3 } from "three";
+
+/** Car readouts shown on the HUD. */
+export interface Telemetry {
+  speedKmh: number;
+  rpm: number;
+  gear: string;
+  surface: SurfaceKind | null;
+}
+
+export type ViewMode = "cockpit" | "chase";
+
+interface GameStore {
+  telemetry: Telemetry;
+  race: RaceSnapshot;
+  viewMode: ViewMode;
+  role: Role;
+  soloActiveRole: Role;
+  pointerLocked: boolean;
+  hoveredLabel: string | null;
+  interactionHitPoint: Vector3 | null;
+  placeholderCubeOn: boolean;
+  setTelemetry: (telemetry: Telemetry) => void;
+  setRace: (race: RaceSnapshot) => void;
+  toggleView: () => void;
+  setRole: (role: Role) => void;
+  setSoloActiveRole: (role: Role) => void;
+  setPointerLocked: (locked: boolean) => void;
+  setHoveredLabel: (label: string | null) => void;
+  setInteractionHitPoint: (point: Vector3 | null) => void;
+  togglePlaceholderCube: () => void;
+}
+
+const INITIAL_RACE: RaceSnapshot = {
+  phase: "ready",
+  countdownRemaining: 0,
+  elapsed: 0,
+  checkpointsPassed: 0,
+  checkpointTotal: 0,
+  splits: [],
+  finishTime: null,
+  progress: 0,
+};
+
+/**
+ * UI-facing game state. The simulation publishes here at a throttled rate; React
+ * HUD components subscribe with selectors so only changed readouts re-render.
+ */
+export const useGameStore = create<GameStore>()((set) => ({
+  telemetry: { speedKmh: 0, rpm: 0, gear: "1", surface: null },
+  race: INITIAL_RACE,
+  viewMode: "cockpit",
+  role: "driver",
+  soloActiveRole: "driver",
+  pointerLocked: false,
+  hoveredLabel: null,
+  interactionHitPoint: null,
+  placeholderCubeOn: false,
+  setTelemetry: (telemetry) => set({ telemetry }),
+  setRace: (race) => set({ race }),
+  toggleView: () => set((state) => ({ viewMode: state.viewMode === "cockpit" ? "chase" : "cockpit" })),
+  setRole: (role) => set({ role }),
+  setSoloActiveRole: (soloActiveRole) => set({ soloActiveRole }),
+  setPointerLocked: (pointerLocked) => set({ pointerLocked }),
+  setHoveredLabel: (hoveredLabel) => set({ hoveredLabel }),
+  setInteractionHitPoint: (interactionHitPoint) => set({ interactionHitPoint }),
+  togglePlaceholderCube: () => set((state) => ({ placeholderCubeOn: !state.placeholderCubeOn })),
+}));
