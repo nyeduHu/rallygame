@@ -1,9 +1,10 @@
 // server/net/gateway.ts
 import type { Server, Socket } from "socket.io";
 import { NET } from "../../lib/net/netConstants";
-import { type ClientEventName, clientEventSchemas } from "../../lib/net/protocol";
+import { type ClientEventName, clientEventSchemas, poseReportSchema } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
 import { RoomManager } from "../rooms/roomManager";
+import { RaceController } from "../race/raceController";
 import { withValidatedSocket } from "./validate";
 
 /** Finds the room that owns a socket's player ID. */
@@ -19,6 +20,33 @@ function emitRoomState(io: Server, room: Room): void {
 
 /** Creates a Socket.IO gateway for room lifecycle and state synchronization. */
 export function bindGateway(io: Server, roomManager: RoomManager): void {
+  const races = new Map<string, { controller: RaceController; timer: NodeJS.Timeout }>();
+
+  /** Starts the authoritative race loop for a room that just left the lobby. */
+  function startRace(room: Room): void {
+    const controller = new RaceController(room, {
+      countdown: (payload) => io.to(room.code).emit("race:countdown", payload),
+      snapshot: (payload) => io.to(room.code).volatile.emit("race:snapshot", payload),
+      event: (payload) => io.to(room.code).emit("race:event", payload),
+      results: (payload) => io.to(room.code).emit("race:results", payload),
+    });
+    const timer = setInterval(() => {
+      controller.tick();
+      emitRoomState(io, room);
+      if (controller.finished) {
+        clearInterval(timer);
+        races.delete(room.code);
+      }
+    }, 1000 / NET.SNAPSHOT_HZ);
+    races.set(room.code, { controller, timer });
+    controller.start();
+  }
+
+  /** Finds the team a player is seated in. */
+  function teamOf(room: Room, playerId: string): string | null {
+    return room.players.get(playerId)?.teamId ?? null;
+  }
+
   io.on("connection", (socket: Socket) => {
     socket.onAny(async (event: string, payload: unknown, ack?: (value: unknown) => void) => {
       if (!clientEventSchemas[event as keyof typeof clientEventSchemas]) {
@@ -124,8 +152,30 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
           const result = room.startRoom();
           if (result.ok) {
             emitRoomState(io, room);
+            startRace(room);
           }
           return result;
+        }
+
+        if (event === "car:pose" || event === "codriver:wipers") {
+          const room = roomForPlayer(roomManager, socket);
+          const playerId = String(socket.data.playerId ?? "");
+          const race = room ? races.get(room.code) : undefined;
+          const teamId = room ? teamOf(room, playerId) : null;
+          const role = room?.players.get(playerId)?.role;
+          if (!room || !race || !teamId) {
+            return { ok: false, error: "not_found" };
+          }
+          if (event === "car:pose") {
+            if (role !== "driver") return { ok: false, error: "forbidden" };
+            // Validated by the zod schema in withValidatedSocket before reaching here.
+            return race.controller.reportPose(teamId, poseReportSchema.parse(data))
+              ? { ok: true as const }
+              : { ok: false as const, error: "rejected" };
+          }
+          if (role !== "codriver") return { ok: false, error: "forbidden" };
+          race.controller.setWipers(teamId, Boolean(data.on));
+          return { ok: true };
         }
 
         if (event === "clock:ping") {

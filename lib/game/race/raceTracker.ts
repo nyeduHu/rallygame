@@ -1,5 +1,6 @@
 // lib/game/race/raceTracker.ts
-import { GATES, SIMULATION, VEHICLE } from "../constants";
+import { SIMULATION, VEHICLE } from "../constants";
+import { stepCheckpoints } from "./checkpointLogic";
 import { RoadIndex } from "../stage/roadIndex";
 import type { StageData } from "../stage/types";
 
@@ -21,8 +22,6 @@ export interface RaceSnapshot {
 
 /** How far from the road the car may be and still be tracked. */
 const TRACKING_RADIUS = 60;
-/** Larger jumps than this are resets or leg-hopping, never real driving within one step. */
-const MAX_PROGRESS_JUMP = 25;
 
 /**
  * Stage timing state machine: countdown, running clock, ordered checkpoints and
@@ -106,22 +105,18 @@ export class RaceTracker {
     this.elapsed += dt;
     const projection = this.index.nearest(x, z, TRACKING_RADIUS);
     if (!projection) return;
-    const previous = this.progressS;
-    const current = projection.s;
-    if (Math.abs(current - previous) > MAX_PROGRESS_JUMP) return;
-    this.progressS = current;
-    if (Math.abs(projection.lateral) > GATES.DETECTION_HALF_WIDTH) return;
-
-    const checkpoints = this.stage.checkpointS;
-    if (this.nextCheckpoint < checkpoints.length) {
-      const gate = checkpoints[this.nextCheckpoint];
-      if (previous < gate && current >= gate) {
-        this.splits = [...this.splits, this.elapsed];
-        this.nextCheckpoint++;
-      }
-      return;
-    }
-    if (previous < this.stage.finishS && current >= this.stage.finishS) {
+    const result = stepCheckpoints(
+      { progressS: this.progressS, nextCheckpoint: this.nextCheckpoint, finished: false },
+      projection.s,
+      projection.lateral,
+      this.stage.checkpointS,
+      this.stage.finishS,
+    );
+    this.progressS = result.state.progressS;
+    this.nextCheckpoint = result.state.nextCheckpoint;
+    if (result.event?.kind === "checkpoint") {
+      this.splits = [...this.splits, this.elapsed];
+    } else if (result.event?.kind === "finish") {
       this.finishTime = this.elapsed;
       this.phase = "finished";
     }
