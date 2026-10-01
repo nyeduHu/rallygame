@@ -226,6 +226,8 @@ export const TABLET = {
   LEGEND_HEIGHT: 42,
   NOTE_STRIP_HEIGHT: 116,
   HEADER_TITLE_X: 56,
+  /** Title starts right of the physical mode button in the top-left corner. */
+  HEADER_TITLE_LEFT: 120,
   HEADER_CENTER_Y: 20,
   HEADER_TITLE_FONT_SIZE: 26,
   HEADER_MODE_FONT_SIZE: 21,

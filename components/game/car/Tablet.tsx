@@ -348,7 +348,7 @@ function drawHeader(context: CanvasRenderingContext2D, mode: TabletMode, width: 
   context.fillStyle = PALETTE.gaugeFace;
   context.font = `bold ${TABLET.HEADER_TITLE_FONT_SIZE}px ${FONT_FAMILY}`;
   context.textBaseline = "middle";
-  context.fillText("RALLY NAV", TABLET.HEADER_TITLE_X, TABLET.HEADER_CENTER_Y);
+  context.fillText("RALLY NAV", TABLET.HEADER_TITLE_LEFT, TABLET.HEADER_CENTER_Y);
   context.textAlign = "right";
   context.fillStyle = PALETTE.lever;
   context.font = `bold ${TABLET.HEADER_MODE_FONT_SIZE}px ${FONT_FAMILY}`;

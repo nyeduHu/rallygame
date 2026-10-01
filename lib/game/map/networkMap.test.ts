@@ -57,3 +57,21 @@ describe("network map fog of war", () => {
     expect(direction.far.z).toBeGreaterThan(500);
   });
 });
+
+describe("NEXT map orientation matches the pace notes", () => {
+  it("draws a left-hand corner curving to the left of the road ahead", async () => {
+    const { generateStage } = await import("../stage/generateStage");
+    const { poseAt } = await import("../stage/roadIndex");
+    const { projectNextPoint } = await import("./mapRenderer");
+    const stage = generateStage(3);
+    const corner = stage.corners.find((c) => c.direction === 1 && c.angle > 0.8);
+    if (!corner) throw new Error("expected a left corner");
+    const start = poseAt(stage.samples, corner.startS);
+    const car = { x: start.x, z: start.z, s: corner.startS, heading: start.heading };
+    const exit = poseAt(stage.samples, corner.endS);
+    const viewport = { width: 600, height: 400 };
+    const point = projectNextPoint({ x: exit.x, z: exit.z, s: corner.endS, heading: exit.heading }, car, viewport, 0.5, 0.72);
+    // The road bends left, so its far end must be left of the car marker on screen.
+    expect(point.x).toBeLessThan(viewport.width / 2);
+  }, 60_000);
+});
