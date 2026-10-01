@@ -28,6 +28,11 @@ interface GameStore {
   interactionHitPoint: Vector3 | null;
   placeholderCubeOn: boolean;
   mech: MechanicalState;
+  /** Role currently standing outside the car on this client, or null when seated. */
+  footRole: Role | null;
+  /** performance.now() when the player last got back in, for the camera blend. */
+  seatedAtMs: number;
+  setFootRole: (role: Role | null) => void;
   hoodOpen: boolean;
   setHoodOpen: (open: boolean) => void;
   /** Debug: `&overheat=1` drives the heat model as if flat out at a standstill. */
@@ -83,6 +88,9 @@ export const useGameStore = create<GameStore>()((set) => ({
   interactionHitPoint: null,
   placeholderCubeOn: false,
   mech: initialMechanics(),
+  footRole: null,
+  seatedAtMs: 0,
+  setFootRole: (footRole) => set(footRole === null ? { footRole, seatedAtMs: performance.now() } : { footRole }),
   hoodOpen: false,
   setHoodOpen: (hoodOpen) => set({ hoodOpen }),
   overheatForced: false,

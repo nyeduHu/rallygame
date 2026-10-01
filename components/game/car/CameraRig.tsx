@@ -4,7 +4,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Euler, Quaternion, Vector3 } from "three";
-import { CAMERA } from "@/lib/game/constants";
+import { CAMERA, ON_FOOT } from "@/lib/game/constants";
 import type { MouseLook } from "@/lib/game/input/mouseLook";
 import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
@@ -23,6 +23,8 @@ const PASSENGER_EYE = new Vector3(CAMERA.PASSENGER_EYE.x, CAMERA.PASSENGER_EYE.y
 const UP = new Vector3(0, 1, 0);
 /** The camera looks down -z; the car faces +z. */
 const FACE_FORWARD_YAW = Math.PI;
+/** Smoothing rate of the seat blend after re-entering the car. */
+const ENTER_BLEND_RATE = 14;
 
 /**
  * Drives the default camera. Cockpit: driver's eye with mouse look and a head that
@@ -55,6 +57,11 @@ export function CameraRig({ session, mouseLook, role, solo }: CameraRigProps) {
 
   useFrame((_, delta) => {
     const s = state.current;
+    // The on-foot rig owns the camera while the player is outside the car.
+    if (useGameStore.getState().footRole !== null) {
+      s.initialised = false;
+      return;
+    }
     const carPosition = session.renderPosition;
     const carQuaternion = session.renderQuaternion;
     mouseLook.update(delta);
@@ -88,7 +95,13 @@ export function CameraRig({ session, mouseLook, role, solo }: CameraRigProps) {
     s.sway.lerp(s.acceleration, 1 - Math.exp(-CAMERA.HEAD_SWAY_SMOOTHING * delta));
 
     s.eye.copy(activeRole === "codriver" ? PASSENGER_EYE : EYE).add(s.sway).applyQuaternion(carQuaternion).add(carPosition);
-    camera.position.copy(s.eye);
+    // After climbing back in, glide from the walking eye height to the seat instead of snapping.
+    const sinceSeated = performance.now() - useGameStore.getState().seatedAtMs;
+    if (sinceSeated < ON_FOOT.ENTER_BLEND_S * 1000) {
+      camera.position.lerp(s.eye, 1 - Math.exp(-ENTER_BLEND_RATE * delta));
+    } else {
+      camera.position.copy(s.eye);
+    }
     s.euler.set(mouseLook.pitch, FACE_FORWARD_YAW + mouseLook.yaw, 0, "YXZ");
     s.look.setFromEuler(s.euler);
     camera.quaternion.copy(carQuaternion).multiply(s.look);

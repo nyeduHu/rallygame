@@ -9,6 +9,8 @@ const CONTROLS: ReadonlyArray<{ keys: string; action: string }> = [
   { keys: "Mouse", action: "Look around" },
   { keys: "R", action: "Reset to road" },
   { keys: "C", action: "Cockpit / chase view" },
+  { keys: "F", action: "Get out / in (car stopped)" },
+  { keys: "Shift", action: "Sprint (on foot)" },
   { keys: "Enter", action: "Restart after finish" },
 ];
 

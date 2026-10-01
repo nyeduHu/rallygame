@@ -1,6 +1,6 @@
 // lib/game/input/mouseLook.ts
-import { CAMERA } from "../constants";
-import { clamp, moveTowards } from "../math";
+import { CAMERA, ON_FOOT } from "../constants";
+import { clamp, moveTowards, wrapAngle } from "../math";
 
 /**
  * Pointer-locked mouse look for the cockpit camera. After a short idle period the
@@ -15,6 +15,7 @@ export class MouseLook {
   private lockListener: ((locked: boolean) => void) | null = null;
   private pitchDownLimit = CAMERA.MAX_PITCH_DOWN;
   private suspended = false;
+  private freeLook = false;
   private movementX = 0;
   private movementY = 0;
   private readonly consumedDelta = { dx: 0, dy: 0 };
@@ -27,6 +28,12 @@ export class MouseLook {
     this.movementX += event.movementX;
     this.movementY += event.movementY;
     if (this.suspended) return;
+    if (this.freeLook) {
+      // On foot: full circle yaw, symmetric pitch limit, no recentring.
+      this.yaw = wrapAngle(this.yaw - event.movementX * CAMERA.MOUSE_SENSITIVITY);
+      this.pitch = clamp(this.pitch - event.movementY * CAMERA.MOUSE_SENSITIVITY, -ON_FOOT.MAX_PITCH, ON_FOOT.MAX_PITCH);
+      return;
+    }
     this.yaw = clamp(this.yaw - event.movementX * CAMERA.MOUSE_SENSITIVITY, -CAMERA.MAX_YAW, CAMERA.MAX_YAW);
     this.pitch = clamp(
       this.pitch - event.movementY * CAMERA.MOUSE_SENSITIVITY,
@@ -58,6 +65,18 @@ export class MouseLook {
   setPitchDownLimit(radians: number): void {
     this.pitchDownLimit = radians;
     this.pitch = clamp(this.pitch, -radians, CAMERA.MAX_PITCH_UP);
+  }
+
+  /**
+   * Switches between the seated (limited, recentring) and on-foot (free 360°) look modes.
+   * @param free - True while walking around.
+   * @param yaw - Yaw to start the new mode with.
+   */
+  setFreeLook(free: boolean, yaw = 0): void {
+    this.freeLook = free;
+    this.yaw = yaw;
+    this.pitch = 0;
+    this.idleTime = 0;
   }
 
   /** Pauses camera motion while an interaction owns pointer movement. */
@@ -120,7 +139,7 @@ export class MouseLook {
    * @param dt - Frame delta.
    */
   update(dt: number): void {
-    if (this.suspended) return;
+    if (this.suspended || this.freeLook) return;
     this.idleTime += dt;
     if (this.idleTime < CAMERA.RECENTER_DELAY) return;
     const step = CAMERA.RECENTER_RATE * dt;

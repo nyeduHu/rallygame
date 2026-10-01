@@ -27,6 +27,7 @@ export function CarRig({ session, role, solo }: CarRigProps) {
   const groupRef = useRef<Group>(null);
   const viewMode = useGameStore((state) => state.viewMode);
   const soloActiveRole = useGameStore((state) => state.soloActiveRole);
+  const footRole = useGameStore((state) => state.footRole);
   const activeRole = solo ? soloActiveRole : role;
 
   useFrame(() => {
@@ -38,7 +39,7 @@ export function CarRig({ session, role, solo }: CarRigProps) {
 
   return (
     <group ref={groupRef} name="car">
-      {viewMode === "cockpit" ? (
+      {viewMode === "cockpit" && footRole === null ? (
         <Cockpit session={session} activeRole={activeRole} />
       ) : (
         <CarExterior session={session} />

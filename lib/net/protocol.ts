@@ -127,6 +127,28 @@ export type CarImpact = z.infer<typeof carImpactSchema>;
 export const engineStatusSchema = z.enum(["ok", "overheating", "failed"]);
 export const brokenPartSchema = z.enum(["radiator_hose", "spark_plug", "drive_belt"]);
 
+export const seatSetSchema = z.object({
+  to: z.enum(["foot", "seat"]),
+}).strict();
+export type SeatSetPayload = z.infer<typeof seatSetSchema>;
+
+export const footPoseSchema = z.object({
+  seq: positiveInt,
+  p: vec3Schema,
+  yaw: finiteNumber,
+}).strict();
+export type FootPose = z.infer<typeof footPoseSchema>;
+
+export const seatStateSchema = z.enum(["seat", "foot"]);
+
+export const onFootViewSchema = z.object({
+  teamId: z.string().min(1),
+  role: roleSchema,
+  p: vec3Schema,
+  yaw: finiteNumber,
+}).strict();
+export type OnFootView = z.infer<typeof onFootViewSchema>;
+
 export const codriverWipersSchema = z.object({
   on: z.boolean(),
 }).strict();
@@ -163,6 +185,7 @@ export const teamSnapshotSchema = z.object({
   engineStatus: engineStatusSchema.optional(),
   brokenPart: brokenPartSchema.nullable().optional(),
   penaltyMs: z.number().finite().nonnegative().optional(),
+  occupancy: z.object({ driver: seatStateSchema, codriver: seatStateSchema }).strict().optional(),
 }).strict();
 export type TeamSnapshot = z.infer<typeof teamSnapshotSchema>;
 
@@ -171,6 +194,7 @@ export const worldSnapshotSchema = z.object({
   raceElapsedMs: z.number().finite(),
   weather: weatherStateSchema,
   teams: z.array(teamSnapshotSchema),
+  onFoot: z.array(onFootViewSchema).optional(),
 }).strict();
 export type WorldSnapshot = z.infer<typeof worldSnapshotSchema>;
 
@@ -218,6 +242,8 @@ export const clientEventSchemas = {
   "car:pose": poseReportSchema,
   "car:inputs": carInputsSchema,
   "car:impact": carImpactSchema,
+  "seat:set": seatSetSchema,
+  "foot:pose": footPoseSchema,
   "codriver:wipers": codriverWipersSchema,
   "clock:ping": clockPingSchema,
 } as const;

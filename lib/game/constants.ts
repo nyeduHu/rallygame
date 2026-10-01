@@ -512,3 +512,36 @@ export const MECHANICS = {
   /** A cone moving faster than this has been hit. */
   CONE_HIT_SPEED: 1.5,
 } as const;
+
+/** On-foot player (leaving the car, pit work). */
+export const ON_FOOT = {
+  /** Car must be slower than this to get out. */
+  EXIT_MAX_SPEED_MS: 0.6,
+  CAPSULE_RADIUS: 0.3,
+  CAPSULE_HALF_HEIGHT: 0.6,
+  EYE_HEIGHT: 1.6,
+  WALK_SPEED_MS: 3.2,
+  SPRINT_MULTIPLIER: 1.8,
+  STEP_HEIGHT: 0.4,
+  STEP_MIN_WIDTH: 0.2,
+  /** Steepest slope (radians) the player can walk up. */
+  MAX_SLOPE_RADIANS: 0.9,
+  MAX_PITCH: 85 * (Math.PI / 180),
+  /** Sprinting speed used by the server as the plausibility limit (x1.5 slack on top). */
+  MAX_SPEED_MS: 3.2 * 1.8,
+  MAX_DISTANCE_FROM_CAR_M: 60,
+  ENTER_RADIUS_M: 2.2,
+  ENTER_BLEND_S: 0.35,
+  /** Door position relative to the car centre along local x (driver +x, passenger -x). */
+  DOOR_OFFSET_X: 1.3,
+  DOOR_OFFSET_Z: 0,
+  /** Where a player appears when leaving the car, beside the door. */
+  EXIT_OFFSET_X: 1.6,
+  EXIT_LIFT: 0.3,
+  GRAVITY: -9.81,
+  /** Body colours/height used for other players' low-poly characters. */
+  BODY_RADIUS: 0.28,
+  BODY_HEIGHT: 1.1,
+  HEAD_RADIUS: 0.2,
+  SERVER_SPEED_SLACK: 1.5,
+} as const;

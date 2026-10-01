@@ -25,5 +25,7 @@ export const NET = {
     "car:pose": 30,
     "car:inputs": 30,
     "car:impact": 10,
+    "foot:pose": 30,
+    "seat:set": 5,
   },
 } as const;

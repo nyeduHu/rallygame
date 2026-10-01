@@ -1,11 +1,12 @@
 // server/race/raceController.ts
-import { DRIVETRAIN, VEHICLE } from "../../lib/game/constants";
+import { DRIVETRAIN, ON_FOOT, VEHICLE } from "../../lib/game/constants";
+import { canExit, canReenter, doorPosition } from "../../lib/game/onfoot/onFootController";
 import { stepCheckpoints, type CheckpointState } from "../../lib/game/race/checkpointLogic";
 import { generateStage } from "../../lib/game/stage/generateStage";
 import { RoadIndex } from "../../lib/game/stage/roadIndex";
 import type { StageData } from "../../lib/game/stage/types";
 import { NET } from "../../lib/net/netConstants";
-import type { CarImpact, CarInputs, PoseReport, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
+import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
 import { initialMechanics, stepMechanics, applyCrash, type MechanicalState } from "../../lib/game/vehicle/mechanics";
 import { MECHANICS } from "../../lib/game/constants";
@@ -43,6 +44,19 @@ interface TeamRaceState {
   failedAtMs: number | null;
   /** Impulse reported since the last tick, applied by the mechanics step. */
   pendingImpulse: number;
+  /** Seat occupancy and, while on foot, the last accepted foot pose per role. */
+  occupancy: Record<Role, "seat" | "foot">;
+  foot: Record<Role, { report: FootPose; atMs: number } | null>;
+}
+
+/**
+ * Heading (yaw about +y) of a pose from its quaternion.
+ * @param pose - Pose report.
+ * @returns Yaw in radians where 0 faces +z.
+ */
+function headingOf(pose: PoseReport): number {
+  const [x, y, z, w] = pose.q;
+  return Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
 }
 
 const NEUTRAL_POSE: Pick<PoseReport, "p" | "q" | "v" | "steer" | "wheelSpin" | "seq"> = {
@@ -96,6 +110,8 @@ export class RaceController {
         crashIndex: 0,
         failedAtMs: null,
         pendingImpulse: 0,
+        occupancy: { driver: "seat", codriver: "seat" },
+        foot: { driver: null, codriver: null },
       });
     }
   }
@@ -105,6 +121,61 @@ export class RaceController {
     this.goAtMs = this.now() + NET.COUNTDOWN_SECONDS * 1000;
     this.lastTickMs = this.goAtMs;
     this.sink.countdown({ goAtServerMs: this.goAtMs });
+  }
+
+  /**
+   * Validates and applies a seat change. Exiting needs a (near) stationary car; re-entering needs
+   * the player to stand within reach of their own door.
+   * @param teamId - Team.
+   * @param role - Player's role.
+   * @param to - Requested state.
+   * @returns Null when accepted, otherwise an error code.
+   */
+  setSeat(teamId: string, role: Role, to: "seat" | "foot"): string | null {
+    const team = this.teams.get(teamId);
+    if (!team || team.status === "dnf" || team.status === "finished") return "not_allowed";
+    if (team.occupancy[role] === to) return null;
+    const car = team.lastPose?.report;
+    if (to === "foot") {
+      if (!car || !canExit(Math.hypot(...car.v))) return "car_moving";
+      team.occupancy[role] = "foot";
+      const yaw = headingOf(car);
+      const door = doorPosition({ x: car.p[0], z: car.p[2], yaw }, role);
+      const side = role === "driver" ? 1 : -1;
+      const out = { x: door.x + side * (ON_FOOT.EXIT_OFFSET_X - ON_FOOT.DOOR_OFFSET_X) * Math.cos(yaw), z: door.z - side * (ON_FOOT.EXIT_OFFSET_X - ON_FOOT.DOOR_OFFSET_X) * Math.sin(yaw) };
+      team.foot[role] = { report: { seq: 0, p: [out.x, car.p[1], out.z], yaw }, atMs: this.now() };
+      return null;
+    }
+    const foot = team.foot[role]?.report;
+    if (!car || !foot) return "not_allowed";
+    const door = doorPosition({ x: car.p[0], z: car.p[2], yaw: headingOf(car) }, role);
+    if (!canReenter({ x: foot.p[0], z: foot.p[2] }, door)) return "too_far";
+    team.occupancy[role] = "seat";
+    team.foot[role] = null;
+    return null;
+  }
+
+  /**
+   * Accepts an on-foot pose if the player is out, the sequence advances, the speed is plausible
+   * and they stay near the car.
+   * @param teamId - Team.
+   * @param role - Player's role.
+   * @param pose - Reported pose.
+   * @returns True when accepted.
+   */
+  reportFootPose(teamId: string, role: Role, pose: FootPose): boolean {
+    const team = this.teams.get(teamId);
+    const previous = team?.foot[role];
+    const car = team?.lastPose?.report;
+    if (!team || !previous || !car || team.occupancy[role] !== "foot") return false;
+    if (!pose.p.every(Number.isFinite) || pose.seq <= previous.report.seq) return false;
+    const nowMs = this.now();
+    const dt = Math.max(0, (nowMs - previous.atMs) / 1000);
+    const moved = Math.hypot(pose.p[0] - previous.report.p[0], pose.p[2] - previous.report.p[2]);
+    if (moved > ON_FOOT.MAX_SPEED_MS * ON_FOOT.SERVER_SPEED_SLACK * dt + NET.POSE_SLACK_METRES) return false;
+    if (Math.hypot(pose.p[0] - car.p[0], pose.p[2] - car.p[2]) > ON_FOOT.MAX_DISTANCE_FROM_CAR_M) return false;
+    team.foot[role] = { report: pose, atMs: nowMs };
+    return true;
   }
 
   /** @returns A team's current mechanical state (for snapshots and tests), or null. */
@@ -186,6 +257,7 @@ export class RaceController {
       raceElapsedMs: nowMs - this.goAtMs,
       weather: { kind: "clear", intensity: 0 },
       teams: [...this.teams.values()].map((team) => this.teamSnapshot(team)),
+      onFoot: this.onFootViews(),
     });
     if ([...this.teams.values()].every((team) => team.status !== "racing")) this.complete();
   }
@@ -263,6 +335,18 @@ export class RaceController {
     }
   }
 
+  /** @returns Every player currently out of a car, for rendering. */
+  private onFootViews(): OnFootView[] {
+    const views: OnFootView[] = [];
+    for (const team of this.teams.values()) {
+      for (const role of ["driver", "codriver"] as const) {
+        const foot = team.foot[role];
+        if (team.occupancy[role] === "foot" && foot) views.push({ teamId: team.teamId, role, p: foot.report.p, yaw: foot.report.yaw });
+      }
+    }
+    return views;
+  }
+
   /** @returns Snapshot entry for a team using its latest validated pose. */
   private teamSnapshot(team: TeamRaceState): TeamSnapshot {
     const pose = team.lastPose?.report ?? NEUTRAL_POSE;
@@ -287,6 +371,7 @@ export class RaceController {
       engineStatus: team.mech.engineStatus,
       brokenPart: team.mech.brokenPart,
       penaltyMs: team.ledger.penaltyMs,
+      occupancy: team.occupancy,
     };
   }
 
