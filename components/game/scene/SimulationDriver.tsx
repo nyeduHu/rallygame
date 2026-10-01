@@ -8,6 +8,7 @@ import type { KeyboardControls } from "@/lib/game/input/keyboardControls";
 import type { GameSession } from "@/lib/game/session";
 import { useGameStore } from "@/lib/game/store";
 import type { Role } from "@/lib/game/roles";
+import { powerFactor } from "@/lib/game/vehicle/mechanics";
 import { FRAME_PRIORITY } from "./framePriority";
 
 interface SimulationDriverProps {
@@ -30,7 +31,8 @@ export function SimulationDriver({ session, keyboard, role, solo }: SimulationDr
   useFrame((_, delta) => {
     const { soloActiveRole } = useGameStore.getState();
     const activeRole = solo ? soloActiveRole : role;
-    session.advance(delta, keyboard.read(activeRole === "driver"));
+    const controls = keyboard.read(activeRole === "driver");
+    session.advance(delta, { ...controls, powerFactor: powerFactor(useGameStore.getState().mech) });
 
     sincePublish.current += delta;
     const phase = session.race.currentPhase;

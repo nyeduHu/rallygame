@@ -41,7 +41,19 @@ export function NetDriver({ session }: NetDriverProps) {
     const q = session.renderQuaternion;
     const v = session.vehicle.currentVelocity;
     seq.current += 1;
-    rallyClient.getSocket().emit("car:pose", {
+    const socket = rallyClient.getSocket();
+    const { vehicle } = session;
+    socket.emit("car:inputs", {
+      throttle01: vehicle.drivetrain.throttle,
+      brake01: vehicle.drivetrain.brake,
+      steer: vehicle.steer,
+      handbrake: vehicle.handbrake,
+      rpm: vehicle.drivetrain.rpm,
+    });
+    const impacts = session.consumeImpacts();
+    if (impacts.solidImpulse > 0) socket.emit("car:impact", { kind: "solid", impulse: impacts.solidImpulse });
+    impacts.coneHits.forEach((objectId) => socket.emit("car:impact", { kind: "cone", impulse: 0, objectId }));
+    socket.emit("car:pose", {
       seq: seq.current,
       epoch: session.resetCount,
       clientTimeMs: performance.now(),

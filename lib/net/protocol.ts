@@ -116,6 +116,17 @@ export const carInputsSchema = z.object({
 }).strict();
 export type CarInputs = z.infer<typeof carInputsSchema>;
 
+export const carImpactSchema = z.object({
+  kind: z.enum(["cone", "solid"]),
+  impulse: z.number().finite().nonnegative(),
+  /** Stable id of the cone that was hit; ignored for solid impacts. */
+  objectId: positiveInt.optional(),
+}).strict();
+export type CarImpact = z.infer<typeof carImpactSchema>;
+
+export const engineStatusSchema = z.enum(["ok", "overheating", "failed"]);
+export const brokenPartSchema = z.enum(["radiator_hose", "spark_plug", "drive_belt"]);
+
 export const codriverWipersSchema = z.object({
   on: z.boolean(),
 }).strict();
@@ -149,6 +160,9 @@ export const teamSnapshotSchema = z.object({
   engineHealth: z.number().finite().min(0).max(1).optional(),
   temperature: z.number().finite().min(0).max(1).optional(),
   damage: z.number().finite().min(0).max(1).optional(),
+  engineStatus: engineStatusSchema.optional(),
+  brokenPart: brokenPartSchema.nullable().optional(),
+  penaltyMs: z.number().finite().nonnegative().optional(),
 }).strict();
 export type TeamSnapshot = z.infer<typeof teamSnapshotSchema>;
 
@@ -203,6 +217,7 @@ export const clientEventSchemas = {
   "room:start": roomStartSchema,
   "car:pose": poseReportSchema,
   "car:inputs": carInputsSchema,
+  "car:impact": carImpactSchema,
   "codriver:wipers": codriverWipersSchema,
   "clock:ping": clockPingSchema,
 } as const;

@@ -507,4 +507,8 @@ export const MECHANICS = {
   TIRE_WEAR_PER_S_GRAVEL: 0.0005,
   TIRE_WEAR_PER_S_GRASS: 0.0012,
   DEFAULT_AMBIENT: 0.5,
+  /** Per-step velocity change below this is normal driving, not an impact. */
+  IMPACT_MIN_DELTA_V: 0.35,
+  /** A cone moving faster than this has been hit. */
+  CONE_HIT_SPEED: 1.5,
 } as const;

@@ -1,7 +1,7 @@
 // server/net/gateway.ts
 import type { Server, Socket } from "socket.io";
 import { NET } from "../../lib/net/netConstants";
-import { type ClientEventName, clientEventSchemas, poseReportSchema } from "../../lib/net/protocol";
+import { type ClientEventName, carImpactSchema, carInputsSchema, clientEventSchemas, poseReportSchema } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
 import { RoomManager } from "../rooms/roomManager";
 import { RaceController } from "../race/raceController";
@@ -184,6 +184,19 @@ export function bindGateway(
             startRace(room);
           }
           return result;
+        }
+
+        if (event === "car:inputs" || event === "car:impact") {
+          const room = roomForPlayer(roomManager, socket);
+          const playerId = String(socket.data.playerId ?? "");
+          const race = room ? races.get(room.code) : undefined;
+          const teamId = room ? teamOf(room, playerId) : null;
+          if (!room || !race || !teamId || room.players.get(playerId)?.role !== "driver") {
+            return { ok: false, error: "forbidden" };
+          }
+          if (event === "car:inputs") race.controller.setInputs(teamId, carInputsSchema.parse(data));
+          else race.controller.reportImpact(teamId, carImpactSchema.parse(data));
+          return { ok: true };
         }
 
         if (event === "car:pose" || event === "codriver:wipers") {

@@ -2,6 +2,7 @@
 "use client";
 
 import { useGameStore } from "@/lib/game/store";
+import { MechanicsBars } from "./MechanicsBars";
 import { Speedometer } from "./Speedometer";
 import { StageTimer } from "./StageTimer";
 
@@ -51,7 +52,8 @@ export function Hud() {
         <Countdown />
         <PointerHint />
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-end justify-between">
+        <MechanicsBars />
         <Speedometer />
       </div>
     </div>

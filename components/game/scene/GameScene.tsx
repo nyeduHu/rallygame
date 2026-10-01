@@ -17,6 +17,7 @@ import { Cones } from "./Cones";
 import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
+import { MechanicsDriver } from "./MechanicsDriver";
 import { Rain } from "./Rain";
 import { RemoteDriver } from "./RemoteDriver";
 import { WeatherDriver } from "./WeatherDriver";
@@ -89,6 +90,7 @@ export function GameScene({
       {session instanceof GameSession && (
         <SimulationDriver session={session} keyboard={keyboard} role={role} solo={solo} />
       )}
+      {session instanceof GameSession && <MechanicsDriver session={session} ownTeamId={online?.ownTeamId} />}
       {session instanceof RemoteSession && online && <RemoteDriver session={session} teamId={online.ownTeamId} />}
       {online && role === "driver" && session instanceof GameSession && <NetDriver session={session} />}
       {online && <GhostCars teamIds={online.remoteTeamIds} />}

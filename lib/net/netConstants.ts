@@ -24,5 +24,6 @@ export const NET = {
   RATE_LIMITS: {
     "car:pose": 30,
     "car:inputs": 30,
+    "car:impact": 10,
   },
 } as const;

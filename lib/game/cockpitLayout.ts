@@ -70,6 +70,14 @@ export const COCKPIT = {
     START_ANGLE: 2.2,
     SPEED_FULL_SCALE_KMH: 200,
     TILT: 0.25,
+    /** Smaller temperature and fuel dials below the main pair, plus warning lamps above. */
+    SECONDARY_OFFSET_Y: -0.085,
+    SECONDARY_RADIUS: 0.034,
+    SECONDARY_SPACING: 0.082,
+    LAMP_OFFSET_Y: 0.085,
+    LAMP_RADIUS: 0.011,
+    LAMP_SPACING: 0.05,
+    LAMP_BLINK_HZ: 3,
   },
   STEERING: {
     CENTER: [DRIVER_X, 0.27, 0.32] as Vec3,

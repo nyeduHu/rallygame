@@ -1,12 +1,16 @@
 // server/race/raceController.ts
-import { VEHICLE } from "../../lib/game/constants";
+import { DRIVETRAIN, VEHICLE } from "../../lib/game/constants";
 import { stepCheckpoints, type CheckpointState } from "../../lib/game/race/checkpointLogic";
 import { generateStage } from "../../lib/game/stage/generateStage";
 import { RoadIndex } from "../../lib/game/stage/roadIndex";
 import type { StageData } from "../../lib/game/stage/types";
 import { NET } from "../../lib/net/netConstants";
-import type { PoseReport, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
+import type { CarImpact, CarInputs, PoseReport, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
+import { initialMechanics, stepMechanics, applyCrash, type MechanicalState } from "../../lib/game/vehicle/mechanics";
+import { MECHANICS } from "../../lib/game/constants";
+import { PENALTY } from "../../lib/game/race/penalties";
+import { PenaltyLedger } from "./penalties";
 import { computeTotalMs, sortResults, type TeamResult } from "./results";
 import { type AcceptedPose, validatePose, ViolationCounter } from "./poseValidator";
 
@@ -29,6 +33,16 @@ interface TeamRaceState {
   finishedAtMs: number | null;
   violations: ViolationCounter;
   suspicious: boolean;
+  mech: MechanicalState;
+  ledger: PenaltyLedger;
+  inputs: CarInputs | null;
+  lastLateral: number;
+  hoodOpen: boolean;
+  crashIndex: number;
+  /** Server time the engine last failed, for the repair-timeout DNF. */
+  failedAtMs: number | null;
+  /** Impulse reported since the last tick, applied by the mechanics step. */
+  pendingImpulse: number;
 }
 
 const NEUTRAL_POSE: Pick<PoseReport, "p" | "q" | "v" | "steer" | "wheelSpin" | "seq"> = {
@@ -46,6 +60,7 @@ export class RaceController {
   private readonly index: RoadIndex;
   private readonly teams = new Map<string, TeamRaceState>();
   private goAtMs = 0;
+  private lastTickMs = 0;
   private done = false;
 
   /**
@@ -73,6 +88,14 @@ export class RaceController {
         finishedAtMs: null,
         violations: new ViolationCounter(),
         suspicious: false,
+        mech: initialMechanics(),
+        ledger: new PenaltyLedger(),
+        inputs: null,
+        lastLateral: 0,
+        hoodOpen: false,
+        crashIndex: 0,
+        failedAtMs: null,
+        pendingImpulse: 0,
       });
     }
   }
@@ -80,7 +103,13 @@ export class RaceController {
   /** Starts the synchronised countdown for every team at the same instant. */
   start(): void {
     this.goAtMs = this.now() + NET.COUNTDOWN_SECONDS * 1000;
+    this.lastTickMs = this.goAtMs;
     this.sink.countdown({ goAtServerMs: this.goAtMs });
+  }
+
+  /** @returns A team's current mechanical state (for snapshots and tests), or null. */
+  mechanicsOf(teamId: string): MechanicalState | null {
+    return this.teams.get(teamId)?.mech ?? null;
   }
 
   /** @returns True once every team has finished or is out. */
@@ -108,6 +137,7 @@ export class RaceController {
       return false;
     }
     const wasReset = team.lastPose !== null && report.epoch > team.lastPose.report.epoch;
+    team.lastLateral = projection.lateral;
     team.lastPose = { report, atMs: nowMs };
     // A reset teleports the car; re-anchor progress so the jump guard in stepCheckpoints does not freeze it.
     if (wasReset) team.progress = { ...team.progress, progressS: projection.s };
@@ -148,6 +178,9 @@ export class RaceController {
     if (this.done || nowMs < this.goAtMs) return;
     if (this.room.phase === "countdown") this.room.phase = "racing";
     this.dnfAbsentDrivers(nowMs);
+    const dt = Math.max(0, (nowMs - this.lastTickMs) / 1000);
+    this.lastTickMs = nowMs;
+    for (const team of this.teams.values()) if (team.status === "racing") this.stepTeam(team, dt, nowMs);
     this.sink.snapshot({
       serverNowMs: nowMs,
       raceElapsedMs: nowMs - this.goAtMs,
@@ -155,6 +188,66 @@ export class RaceController {
       teams: [...this.teams.values()].map((team) => this.teamSnapshot(team)),
     });
     if ([...this.teams.values()].every((team) => team.status !== "racing")) this.complete();
+  }
+
+  /**
+   * Records driver inputs used by the fuel/heat model.
+   * @param teamId - Team.
+   * @param inputs - Latest pedals and rpm.
+   */
+  setInputs(teamId: string, inputs: CarInputs): void {
+    const team = this.teams.get(teamId);
+    if (team) team.inputs = inputs;
+  }
+
+  /**
+   * Applies a client-reported impact: solid impacts feed damage and crashes, cones are small mistakes.
+   * @param teamId - Team.
+   * @param impact - Reported impact (impulse clamped).
+   */
+  reportImpact(teamId: string, impact: CarImpact): void {
+    const team = this.teams.get(teamId);
+    if (!team || team.status !== "racing") return;
+    const impulse = Math.min(impact.impulse, PENALTY.MAX_IMPACT_IMPULSE);
+    if (impact.kind === "cone") {
+      team.ledger.addObjectHit(impact.objectId ?? -1);
+      return;
+    }
+    team.pendingImpulse = Math.max(team.pendingImpulse, impulse);
+    if (impulse >= MECHANICS.CRASH_IMPULSE) {
+      team.ledger.addCrash();
+      team.mech = applyCrash(team.mech, this.stage.seed, team.crashIndex);
+      team.crashIndex += 1;
+    }
+  }
+
+  /**
+   * Integrates mechanics and penalties for one team and applies mechanical DNF rules.
+   * @param team - Team state.
+   * @param dt - Seconds since the last tick.
+   * @param nowMs - Server time.
+   */
+  private stepTeam(team: TeamRaceState, dt: number, nowMs: number): void {
+    const speed = team.lastPose ? Math.hypot(...team.lastPose.report.v) : 0;
+    team.mech = stepMechanics(team.mech, {
+      throttle01: team.inputs?.throttle01 ?? 0,
+      rpm01: Math.min(1, (team.inputs?.rpm ?? 0) / DRIVETRAIN.REDLINE_RPM),
+      speedMs: speed,
+      surface: null,
+      impactImpulse: team.pendingImpulse,
+      ambientTemp01: MECHANICS.DEFAULT_AMBIENT,
+      hoodOpen: team.hoodOpen,
+      dt,
+    });
+    team.pendingImpulse = 0;
+    team.ledger.trackOffRoad(team.lastLateral, team.progress.progressS, this.stage.corners, dt, nowMs);
+
+    if (team.mech.engineStatus === "failed") team.failedAtMs ??= nowMs;
+    else team.failedAtMs = null;
+    if (team.mech.damage01 >= 1) this.markDnf(team.teamId, "destroyed");
+    else if (team.failedAtMs !== null && nowMs - team.failedAtMs > PENALTY.DNF_AFTER_FAILED_SECONDS * 1000) {
+      this.markDnf(team.teamId, "engine_failed");
+    }
   }
 
   /** Marks teams DNF when their driver has been gone longer than the reconnect grace period. */
@@ -187,6 +280,13 @@ export class RaceController {
       checkpoint: team.progress.nextCheckpoint,
       progress01: Math.min(1, Math.max(0, (team.progress.progressS - this.stage.startS) / span)),
       status: team.status,
+      fuel: team.mech.fuel01,
+      engineHealth: team.mech.engineHealth01,
+      temperature: team.mech.temperature01,
+      damage: team.mech.damage01,
+      engineStatus: team.mech.engineStatus,
+      brokenPart: team.mech.brokenPart,
+      penaltyMs: team.ledger.penaltyMs,
     };
   }
 
@@ -201,13 +301,13 @@ export class RaceController {
         name: team.name,
         status: team.status === "finished" ? "finished" : "dnf",
         rawMs,
-        penaltyMs: 0,
+        penaltyMs: team.ledger.penaltyMs,
         pitMs: 0,
-        totalMs: team.status === "finished" ? computeTotalMs(rawMs, 0, 0) : (1 - (team.progress.progressS - this.stage.startS) / span) * 1e9,
-        damage01: 0,
-        fuel01: 1,
-        navErrors: 0,
-        crashes: 0,
+        totalMs: team.status === "finished" ? computeTotalMs(rawMs, team.ledger.penaltyMs, 0) : (1 - (team.progress.progressS - this.stage.startS) / span) * 1e9,
+        damage01: team.mech.damage01,
+        fuel01: team.mech.fuel01,
+        navErrors: team.ledger.navErrors,
+        crashes: team.ledger.crashes,
       };
     });
     const ranked = sortResults(entries);

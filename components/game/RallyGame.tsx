@@ -86,6 +86,7 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
       rainForced: params.get("rain") === "1",
       debug: params.get("debug") === "1",
       online: online !== undefined,
+      overheatForced: params.get("overheat") === "1",
     });
   }, [online]);
 
