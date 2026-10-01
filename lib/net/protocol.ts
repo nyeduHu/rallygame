@@ -95,6 +95,8 @@ export type RoomStartPayload = z.infer<typeof roomStartSchema>;
 
 export const poseReportSchema = z.object({
   seq: positiveInt,
+  /** Increments when the driver resets to the road, so the server accepts the jump. */
+  epoch: positiveInt,
   clientTimeMs: z.number().finite().nonnegative(),
   p: vec3Schema,
   q: vec4Schema,

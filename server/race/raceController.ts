@@ -107,7 +107,10 @@ export class RaceController {
       }
       return false;
     }
+    const wasReset = team.lastPose !== null && report.epoch > team.lastPose.report.epoch;
     team.lastPose = { report, atMs: nowMs };
+    // A reset teleports the car; re-anchor progress so the jump guard in stepCheckpoints does not freeze it.
+    if (wasReset) team.progress = { ...team.progress, progressS: projection.s };
     const step = stepCheckpoints(team.progress, projection.s, projection.lateral, this.stage.checkpointS, this.stage.finishS);
     team.progress = step.state;
     if (step.event?.kind === "checkpoint") {

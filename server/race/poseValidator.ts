@@ -31,6 +31,8 @@ export function validatePose(
   if (speed > NET.MAX_SPEED_MS) return "too_fast";
   if (previous) {
     if (report.seq <= previous.report.seq) return "stale_seq";
+    // A reset-to-road is a legitimate jump; the road-distance check below still applies.
+    if (report.epoch > previous.report.epoch) return distanceFromRoad === null || distanceFromRoad > NET.MAX_OFF_ROAD_METRES ? "off_road" : null;
     const dt = Math.max(0, (nowMs - previous.atMs) / 1000);
     const previousSpeed = Math.hypot(...previous.report.v);
     const moved = Math.hypot(

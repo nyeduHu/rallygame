@@ -1,5 +1,5 @@
 // lib/game/race/raceTracker.ts
-import { SIMULATION, VEHICLE } from "../constants";
+import { GATES, SIMULATION, VEHICLE } from "../constants";
 import { stepCheckpoints } from "./checkpointLogic";
 import { RoadIndex } from "../stage/roadIndex";
 import type { StageData } from "../stage/types";
@@ -82,9 +82,28 @@ export class RaceTracker {
     return this.phase === "running" || this.phase === "finished";
   }
 
-  /** @returns Last tracked arc length, used for reset-to-road. */
+  /** @returns Last tracked arc length. */
   get lastProgressS(): number {
     return this.progressS;
+  }
+
+  /** @returns Arc length of the next gate that must be crossed. */
+  private get nextGateS(): number {
+    return this.stage.checkpointS[this.nextCheckpoint] ?? this.stage.finishS;
+  }
+
+  /** @returns True when the car has driven past the next gate without crossing it. */
+  get missedGate(): boolean {
+    return this.phase === "running" && this.progressS > this.nextGateS + GATES.MISS_MARGIN;
+  }
+
+  /**
+   * Arc length reset-to-road should use: the last progress, or just before a missed gate so the
+   * ordered checkpoint can still be crossed.
+   * @returns Arc length to respawn at.
+   */
+  get resetS(): number {
+    return this.missedGate ? this.nextGateS - GATES.RESET_BEFORE_GATE : this.progressS;
   }
 
   /**

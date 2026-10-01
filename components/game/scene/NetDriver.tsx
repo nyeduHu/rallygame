@@ -43,6 +43,7 @@ export function NetDriver({ session }: NetDriverProps) {
     seq.current += 1;
     rallyClient.getSocket().emit("car:pose", {
       seq: seq.current,
+      epoch: session.resetCount,
       clientTimeMs: performance.now(),
       p: [p.x, p.y, p.z],
       q: [q.x, q.y, q.z, q.w],

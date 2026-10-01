@@ -10,6 +10,7 @@ describe("network protocol schemas", () => {
 
     const pose = {
       seq: 12,
+      epoch: 0,
       clientTimeMs: 1640,
       p: [1.2, 2.5, 3.6],
       q: [0, 0.1, 0.2, 0.9],
@@ -29,6 +30,7 @@ describe("network protocol schemas", () => {
     expect(
       poseReportSchema.safeParse({
         seq: Number.NaN,
+        epoch: 0,
         clientTimeMs: 1,
         p: [1, 2, 3],
         q: [0, 0, 0, 1],
@@ -45,6 +47,7 @@ describe("network protocol schemas", () => {
     expect(roomJoinSchema.safeParse({ roomCode: "A1B2C3", name: "M".repeat(30) }).success).toBe(false);
     expect(poseReportSchema.safeParse({
       seq: 1,
+      epoch: 0,
       clientTimeMs: 1,
       p: [1, 2],
       q: [0, 0, 0, 1],

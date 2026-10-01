@@ -26,6 +26,8 @@ export class GameSession {
   readonly renderQuaternion = new Quaternion();
   private accumulator = 0;
   private resetCooldown = 0;
+  /** Increments on every reset-to-road so the server accepts the pose jump. */
+  resetCount = 0;
 
   /**
    * @param R - Initialised Rapier module.
@@ -77,10 +79,11 @@ export class GameSession {
    */
   resetToRoad(): void {
     if (this.resetCooldown > 0 || !this.race.controlsEnabled) return;
-    const s = this.race.lastProgressS;
+    const s = this.race.resetS;
     this.vehicle.reset(poseAt(this.stage.samples, s), VEHICLE.RESET_LIFT);
     this.race.teleportTo(s);
     this.resetCooldown = VEHICLE.RESET_COOLDOWN;
+    this.resetCount += 1;
   }
 
   /** Restarts the stage: car to spawn, cones restored, timer reset. */

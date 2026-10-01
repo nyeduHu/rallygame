@@ -29,7 +29,7 @@ describe("RaceController", () => {
     /** Builds a pose at arc length s moving forward. */
     const at = (s: number): PoseReport => {
       const pose = poseAt(stage.samples, s);
-      return { seq: seq++, clientTimeMs: 0, p: [pose.x, pose.y, pose.z], q: [0, 0, 0, 1], v: [20, 0, 0], steer: 0, wheelSpin: 0, susp: [0, 0, 0, 0] };
+      return { seq: seq++, epoch: 0, clientTimeMs: 0, p: [pose.x, pose.y, pose.z], q: [0, 0, 0, 1], v: [20, 0, 0], steer: 0, wheelSpin: 0, susp: [0, 0, 0, 0] };
     };
     expect(controller.reportPose(team.id, at(stage.startS))).toBe(true);
     const forged = at(stage.startS + 500);

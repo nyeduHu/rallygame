@@ -152,6 +152,10 @@ export const GATES = {
   TOWER_HALF_EXTENTS: { x: 0.93, y: 3, z: 0.93 },
   /** Lateral tolerance for a checkpoint crossing to count. */
   DETECTION_HALF_WIDTH: 12,
+  /** Progress beyond a gate by this much without crossing it counts as a missed gate. */
+  MISS_MARGIN: 10,
+  /** A reset after a missed gate puts the car this far before the gate. */
+  RESET_BEFORE_GATE: 15,
 } as const;
 
 /** Pace-note classification and callout distances. */
@@ -263,6 +267,9 @@ export const AUTOPILOT = {
   MAX_LATERAL_ACCELERATION: 4.5,
   BRAKING_DECELERATION: 4,
   SPEED_MARGIN_MS: 0.5,
+  /** Below this speed the car counts as stuck, like a human reaching for the reset key. */
+  STUCK_SPEED_MS: 0.5,
+  STUCK_SECONDS: 3,
   TUNED_FRONT_GRIP: 1.01,
   BASELINE_SEED: 847291,
 } as const;
