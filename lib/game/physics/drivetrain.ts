@@ -7,6 +7,8 @@ import { getActiveTuning } from "../tuning";
 export interface PedalInput {
   throttleKey: boolean;
   brakeKey: boolean;
+  /** Engine output multiplier from the mechanical model; 1 leaves behaviour unchanged. */
+  powerFactor?: number;
 }
 
 /** Drivetrain output for one physics step. */
@@ -120,7 +122,7 @@ export class Drivetrain {
     let engineTorque = 0;
     if (this.shiftTimer <= 0) {
       if (this.throttle > THROTTLE_IDLE_THRESHOLD) {
-        engineTorque = rpm < DRIVETRAIN.REDLINE_RPM ? this.throttle * torqueAt(this.rpm) : 0;
+        engineTorque = rpm < DRIVETRAIN.REDLINE_RPM ? this.throttle * torqueAt(this.rpm) * (input.powerFactor ?? 1) : 0;
       } else if (Math.abs(forwardSpeed) > ENGINE_BRAKE_MIN_SPEED) {
         engineTorque = -DRIVETRAIN.ENGINE_BRAKE_TORQUE * (this.rpm / DRIVETRAIN.REDLINE_RPM);
       }

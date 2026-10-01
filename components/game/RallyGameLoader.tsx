@@ -15,6 +15,7 @@ interface RallyGameLoaderProps {
   seed: number;
   role: Role;
   solo: boolean;
+  online?: { ownTeamId: string; remoteTeamIds: string[] };
 }
 
 /**
@@ -23,6 +24,6 @@ interface RallyGameLoaderProps {
  * @param props - Stage seed.
  * @returns Lazy game.
  */
-export function RallyGameLoader({ seed, role, solo }: RallyGameLoaderProps) {
-  return <RallyGame key={`${seed}-${role}-${solo}`} seed={seed} role={role} solo={solo} />;
+export function RallyGameLoader({ seed, role, solo, online }: RallyGameLoaderProps) {
+  return <RallyGame key={`${seed}-${role}-${solo}-${online ? "online" : "local"}`} seed={seed} role={role} solo={solo} online={online} />;
 }

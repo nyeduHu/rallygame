@@ -8,7 +8,10 @@ import type { KeyboardControls } from "@/lib/game/input/keyboardControls";
 import type { GameSession } from "@/lib/game/session";
 import { useGameStore } from "@/lib/game/store";
 import type { Role } from "@/lib/game/roles";
+import { powerFactor } from "@/lib/game/vehicle/mechanics";
 import { FRAME_PRIORITY } from "./framePriority";
+
+const HELD_BY_DRIVER_OUT = { throttle: false, brake: false, steer: 0, handbrake: true } as const;
 
 interface SimulationDriverProps {
   session: GameSession;
@@ -30,7 +33,11 @@ export function SimulationDriver({ session, keyboard, role, solo }: SimulationDr
   useFrame((_, delta) => {
     const { soloActiveRole } = useGameStore.getState();
     const activeRole = solo ? soloActiveRole : role;
-    session.advance(delta, keyboard.read(activeRole === "driver"));
+    const { footRole, mech } = useGameStore.getState();
+    // A driver standing outside holds the handbrake and the engine delivers no power.
+    const driverOut = footRole === "driver";
+    const controls = driverOut ? HELD_BY_DRIVER_OUT : keyboard.read(activeRole === "driver" && footRole === null);
+    session.advance(delta, { ...controls, powerFactor: driverOut ? 0 : powerFactor(mech) });
 
     sincePublish.current += delta;
     const phase = session.race.currentPhase;

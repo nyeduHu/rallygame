@@ -57,6 +57,7 @@ export type RoomView = z.infer<typeof roomViewSchema>;
 export const roomCreateSchema = z.object({
   name: playerNameSchema,
   maxTeams: z.number().int().min(1).max(NET.MAX_TEAMS_LIMIT).optional(),
+  useDailySeed: z.boolean().optional(),
 }).strict();
 export type RoomCreatePayload = z.infer<typeof roomCreateSchema>;
 
@@ -95,6 +96,8 @@ export type RoomStartPayload = z.infer<typeof roomStartSchema>;
 
 export const poseReportSchema = z.object({
   seq: positiveInt,
+  /** Increments when the driver resets to the road, so the server accepts the jump. */
+  epoch: positiveInt,
   clientTimeMs: z.number().finite().nonnegative(),
   p: vec3Schema,
   q: vec4Schema,
@@ -113,6 +116,61 @@ export const carInputsSchema = z.object({
   rpm: finiteNumber,
 }).strict();
 export type CarInputs = z.infer<typeof carInputsSchema>;
+
+export const carImpactSchema = z.object({
+  kind: z.enum(["cone", "solid"]),
+  impulse: z.number().finite().nonnegative(),
+  /** Stable id of the cone that was hit; ignored for solid impacts. */
+  objectId: positiveInt.optional(),
+}).strict();
+export type CarImpact = z.infer<typeof carImpactSchema>;
+
+export const engineStatusSchema = z.enum(["ok", "overheating", "failed"]);
+export const brokenPartSchema = z.enum(["radiator_hose", "spark_plug", "drive_belt"]);
+
+export const seatSetSchema = z.object({
+  to: z.enum(["foot", "seat"]),
+}).strict();
+export type SeatSetPayload = z.infer<typeof seatSetSchema>;
+
+export const footPoseSchema = z.object({
+  seq: positiveInt,
+  p: vec3Schema,
+  yaw: finiteNumber,
+}).strict();
+export type FootPose = z.infer<typeof footPoseSchema>;
+
+export const seatStateSchema = z.enum(["seat", "foot"]);
+
+export const onFootViewSchema = z.object({
+  teamId: z.string().min(1),
+  role: roleSchema,
+  p: vec3Schema,
+  yaw: finiteNumber,
+}).strict();
+export type OnFootView = z.infer<typeof onFootViewSchema>;
+
+export const repairStepSchema = z.object({
+  step: z.enum(["OPEN_HOOD", "INSPECT", "GRAB_TOOL", "REMOVE_PART", "INSTALL_NEW", "CLOSE_HOOD", "IGNITION", "UNSCREW_CAP", "POUR_WATER", "SCREW_CAP"]),
+  partId: brokenPartSchema.optional(),
+}).strict();
+export type RepairStepPayload = z.infer<typeof repairStepSchema>;
+
+export const repairViewSchema = z.object({
+  kind: z.string().min(1),
+  part: brokenPartSchema.optional(),
+}).strict();
+export type RepairView = z.infer<typeof repairViewSchema>;
+
+export const refuelStepSchema = z.object({
+  step: z.enum(["OPEN_FLAP", "CLOSE_FLAP", "GRAB_HOSE", "CONNECT", "START", "STOP", "DISCONNECT", "RETURN_HOSE"]),
+}).strict();
+export type RefuelStepPayload = z.infer<typeof refuelStepSchema>;
+
+export const refuelViewSchema = z.object({
+  kind: z.enum(["idle", "hose_held", "connected", "fueling"]),
+  flapOpen: z.boolean(),
+}).strict();
 
 export const codriverWipersSchema = z.object({
   on: z.boolean(),
@@ -147,6 +205,14 @@ export const teamSnapshotSchema = z.object({
   engineHealth: z.number().finite().min(0).max(1).optional(),
   temperature: z.number().finite().min(0).max(1).optional(),
   damage: z.number().finite().min(0).max(1).optional(),
+  engineStatus: engineStatusSchema.optional(),
+  brokenPart: brokenPartSchema.nullable().optional(),
+  penaltyMs: z.number().finite().nonnegative().optional(),
+  repair: repairViewSchema.optional(),
+  refuel: refuelViewSchema.optional(),
+  pitReady: z.boolean().optional(),
+  hoodOpen: z.boolean().optional(),
+  occupancy: z.object({ driver: seatStateSchema, codriver: seatStateSchema }).strict().optional(),
 }).strict();
 export type TeamSnapshot = z.infer<typeof teamSnapshotSchema>;
 
@@ -155,6 +221,7 @@ export const worldSnapshotSchema = z.object({
   raceElapsedMs: z.number().finite(),
   weather: weatherStateSchema,
   teams: z.array(teamSnapshotSchema),
+  onFoot: z.array(onFootViewSchema).optional(),
 }).strict();
 export type WorldSnapshot = z.infer<typeof worldSnapshotSchema>;
 
@@ -201,6 +268,11 @@ export const clientEventSchemas = {
   "room:start": roomStartSchema,
   "car:pose": poseReportSchema,
   "car:inputs": carInputsSchema,
+  "car:impact": carImpactSchema,
+  "seat:set": seatSetSchema,
+  "repair:step": repairStepSchema,
+  "refuel:step": refuelStepSchema,
+  "foot:pose": footPoseSchema,
   "codriver:wipers": codriverWipersSchema,
   "clock:ping": clockPingSchema,
 } as const;

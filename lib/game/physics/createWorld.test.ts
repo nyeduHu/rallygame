@@ -64,6 +64,7 @@ function createTestStage(): StageData {
     barriers: [],
     cones: [],
     spawn: { x: ROAD.WIDTH / 2 + GATES.TOWER_OFFSET, y: 0, z: CAR_START_Z, heading: 0 },
+  pit: null,
   };
 }
 

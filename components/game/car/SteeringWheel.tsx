@@ -7,7 +7,7 @@ import { Euler, Quaternion, Vector3, type Group, type Mesh } from "three";
 import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { STEERING } from "@/lib/game/constants";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import { FRAME_PRIORITY } from "../scene/framePriority";
 
 const { CENTER, TILT, RADIUS, TUBE, SPOKE_WIDTH, HUB_RADIUS, HUB_DEPTH, COLUMN_LENGTH, COLUMN_RADIUS, GRIP_ANGLE } =
@@ -29,7 +29,7 @@ const GRIPS = [
 const ELBOWS = [new Vector3(...COCKPIT.HANDS.ELBOW_LEFT), new Vector3(...COCKPIT.HANDS.ELBOW_RIGHT)] as const;
 
 interface SteeringWheelProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 /**

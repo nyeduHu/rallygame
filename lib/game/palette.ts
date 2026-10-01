@@ -36,3 +36,6 @@ export const PALETTE = {
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
+
+/** Distinct body colours for other teams' cars in online races. */
+export const TEAM_COLORS = ["#e2462f", "#2f5fb3", "#3ca55c", "#d9b23c", "#8a4fc7", "#e07b2f", "#2fb5b0", "#c7478f"] as const;

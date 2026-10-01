@@ -22,12 +22,15 @@ interface RunResult {
   checkpoints: number;
   maxSpeedMs: number;
   maxAbsRollRadians: number;
+  resets: number;
 }
 
 const NEUTRAL_STEER = 0;
 const NO_PEDAL = false;
 const NO_HANDBRAKE = false;
 const FULL_THROTTLE = true;
+/** Steps between trace lines when AUTOPILOT_TRACE is set (about 5 s). */
+const TRACE_INTERVAL_STEPS = 300;
 
 /**
  * Parses the optional single-seed and tuning switches.
@@ -69,6 +72,8 @@ function runSeed(R: Awaited<ReturnType<typeof loadRapier>>, seed: number): RunRe
   let simulationSeconds = 0;
   let maxSpeedMs = 0;
   let maxAbsRollRadians = 0;
+  let stuckSeconds = 0;
+  let resets = 0;
 
   session.beginCountdown();
   try {
@@ -76,6 +81,21 @@ function runSeed(R: Awaited<ReturnType<typeof loadRapier>>, seed: number): RunRe
       const controls = controlsFor(session, stage);
       session.advance(SIMULATION.FIXED_TIMESTEP, controls);
       simulationSeconds += SIMULATION.FIXED_TIMESTEP;
+      if (process.env.AUTOPILOT_TRACE && Math.round(simulationSeconds / SIMULATION.FIXED_TIMESTEP) % TRACE_INTERVAL_STEPS === 0) {
+        const position = session.vehicle.currentPosition;
+        console.log(
+          `t=${simulationSeconds.toFixed(0)} s=${session.race.lastProgressS.toFixed(0)}/${stage.finishS.toFixed(0)} cp=${session.race.snapshot().checkpointsPassed} speed=${session.vehicle.forwardSpeed.toFixed(1)} x=${position.x.toFixed(0)} z=${position.z.toFixed(0)} y=${position.y.toFixed(1)}`,
+        );
+      }
+      const running = session.race.currentPhase === "running";
+      stuckSeconds = running && Math.abs(session.vehicle.forwardSpeed) < AUTOPILOT.STUCK_SPEED_MS
+        ? stuckSeconds + SIMULATION.FIXED_TIMESTEP
+        : 0;
+      if (stuckSeconds >= AUTOPILOT.STUCK_SECONDS || session.race.missedGate) {
+        session.resetToRoad();
+        resets += 1;
+        stuckSeconds = 0;
+      }
       maxSpeedMs = Math.max(maxSpeedMs, Math.abs(session.vehicle.forwardSpeed));
       maxAbsRollRadians = Math.max(maxAbsRollRadians, readAbsoluteRoll(session.vehicle.currentQuaternion));
     }
@@ -88,6 +108,7 @@ function runSeed(R: Awaited<ReturnType<typeof loadRapier>>, seed: number): RunRe
       checkpoints: race.checkpointsPassed,
       maxSpeedMs,
       maxAbsRollRadians,
+      resets,
     };
   } finally {
     session.dispose();

@@ -1,5 +1,6 @@
 // lib/game/race/raceTracker.ts
 import { GATES, SIMULATION, VEHICLE } from "../constants";
+import { stepCheckpoints } from "./checkpointLogic";
 import { RoadIndex } from "../stage/roadIndex";
 import type { StageData } from "../stage/types";
 
@@ -21,8 +22,6 @@ export interface RaceSnapshot {
 
 /** How far from the road the car may be and still be tracked. */
 const TRACKING_RADIUS = 60;
-/** Larger jumps than this are resets or leg-hopping, never real driving within one step. */
-const MAX_PROGRESS_JUMP = 25;
 
 /**
  * Stage timing state machine: countdown, running clock, ordered checkpoints and
@@ -63,6 +62,16 @@ export class RaceTracker {
     if (this.phase === "ready") this.phase = "countdown";
   }
 
+  /**
+   * Starts the countdown so it ends at a server-chosen instant.
+   * @param remainingSeconds - Seconds until the shared go time (clamped to the default length).
+   */
+  beginCountdownAt(remainingSeconds: number): void {
+    if (this.phase !== "ready") return;
+    this.countdown = Math.min(SIMULATION.COUNTDOWN_SECONDS, Math.max(0, remainingSeconds));
+    this.phase = "countdown";
+  }
+
   /** @returns Current phase. */
   get currentPhase(): RacePhase {
     return this.phase;
@@ -73,9 +82,28 @@ export class RaceTracker {
     return this.phase === "running" || this.phase === "finished";
   }
 
-  /** @returns Last tracked arc length, used for reset-to-road. */
+  /** @returns Last tracked arc length. */
   get lastProgressS(): number {
     return this.progressS;
+  }
+
+  /** @returns Arc length of the next gate that must be crossed. */
+  private get nextGateS(): number {
+    return this.stage.checkpointS[this.nextCheckpoint] ?? this.stage.finishS;
+  }
+
+  /** @returns True when the car has driven past the next gate without crossing it. */
+  get missedGate(): boolean {
+    return this.phase === "running" && this.progressS > this.nextGateS + GATES.MISS_MARGIN;
+  }
+
+  /**
+   * Arc length reset-to-road should use: the last progress, or just before a missed gate so the
+   * ordered checkpoint can still be crossed.
+   * @returns Arc length to respawn at.
+   */
+  get resetS(): number {
+    return this.missedGate ? this.nextGateS - GATES.RESET_BEFORE_GATE : this.progressS;
   }
 
   /**
@@ -106,22 +134,18 @@ export class RaceTracker {
     this.elapsed += dt;
     const projection = this.index.nearest(x, z, TRACKING_RADIUS);
     if (!projection) return;
-    const previous = this.progressS;
-    const current = projection.s;
-    if (Math.abs(current - previous) > MAX_PROGRESS_JUMP) return;
-    this.progressS = current;
-    if (Math.abs(projection.lateral) > GATES.DETECTION_HALF_WIDTH) return;
-
-    const checkpoints = this.stage.checkpointS;
-    if (this.nextCheckpoint < checkpoints.length) {
-      const gate = checkpoints[this.nextCheckpoint];
-      if (previous < gate && current >= gate) {
-        this.splits = [...this.splits, this.elapsed];
-        this.nextCheckpoint++;
-      }
-      return;
-    }
-    if (previous < this.stage.finishS && current >= this.stage.finishS) {
+    const result = stepCheckpoints(
+      { progressS: this.progressS, nextCheckpoint: this.nextCheckpoint, finished: false },
+      projection.s,
+      projection.lateral,
+      this.stage.checkpointS,
+      this.stage.finishS,
+    );
+    this.progressS = result.state.progressS;
+    this.nextCheckpoint = result.state.nextCheckpoint;
+    if (result.event?.kind === "checkpoint") {
+      this.splits = [...this.splits, this.elapsed];
+    } else if (result.event?.kind === "finish") {
       this.finishTime = this.elapsed;
       this.phase = "finished";
     }

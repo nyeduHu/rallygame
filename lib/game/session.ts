@@ -1,6 +1,6 @@
 // lib/game/session.ts
 import { Quaternion, Vector3 } from "three";
-import { SIMULATION, VEHICLE } from "./constants";
+import { MECHANICS, SIMULATION, VEHICLE } from "./constants";
 import { createPhysicsWorld, type PhysicsWorld } from "./physics/createWorld";
 import type { Rapier } from "./physics/rapier";
 import { Vehicle, type DriverControls } from "./physics/vehicle";
@@ -26,6 +26,12 @@ export class GameSession {
   readonly renderQuaternion = new Quaternion();
   private accumulator = 0;
   private resetCooldown = 0;
+  /** Increments on every reset-to-road so the server accepts the pose jump. */
+  resetCount = 0;
+  private pendingSolidImpulse = 0;
+  private readonly pendingConeHits: number[] = [];
+  private readonly hitCones = new Set<number>();
+  private readonly velocityBefore = new Vector3();
 
   /**
    * @param R - Initialised Rapier module.
@@ -56,14 +62,42 @@ export class GameSession {
     this.resetCooldown = Math.max(0, this.resetCooldown - frameDelta);
     while (this.accumulator >= dt) {
       const active = this.race.controlsEnabled ? controls : HELD_CONTROLS;
+      const before = this.vehicle.currentVelocity;
+      this.velocityBefore.set(before.x, before.y, before.z);
       this.vehicle.step(active, dt);
       this.physics.world.step();
       this.vehicle.capturePose();
+      this.senseImpacts();
       const position = this.vehicle.currentPosition;
       this.race.update(dt, position.x, position.z);
       this.accumulator -= dt;
     }
     this.vehicle.interpolate(this.accumulator / dt, this.renderPosition, this.renderQuaternion);
+  }
+
+  /** Accumulates solid-impact momentum and notices newly struck cones after a physics step. */
+  private senseImpacts(): void {
+    const after = this.vehicle.currentVelocity;
+    const dv = Math.hypot(after.x - this.velocityBefore.x, after.y - this.velocityBefore.y, after.z - this.velocityBefore.z);
+    this.pendingSolidImpulse += VEHICLE.MASS * Math.max(0, dv - MECHANICS.IMPACT_MIN_DELTA_V);
+    this.physics.coneBodies.forEach((body, index) => {
+      if (this.hitCones.has(index)) return;
+      const v = body.linvel();
+      if (Math.hypot(v.x, v.y, v.z) > MECHANICS.CONE_HIT_SPEED) {
+        this.hitCones.add(index);
+        this.pendingConeHits.push(index);
+      }
+    });
+  }
+
+  /**
+   * Returns and clears impacts sensed since the last call.
+   * @returns Solid-impact impulse (N·s) and newly hit cone indices.
+   */
+  consumeImpacts(): { solidImpulse: number; coneHits: number[] } {
+    const result = { solidImpulse: this.pendingSolidImpulse, coneHits: this.pendingConeHits.splice(0) };
+    this.pendingSolidImpulse = 0;
+    return result;
   }
 
   /** Starts the countdown from the ready state. */
@@ -77,10 +111,11 @@ export class GameSession {
    */
   resetToRoad(): void {
     if (this.resetCooldown > 0 || !this.race.controlsEnabled) return;
-    const s = this.race.lastProgressS;
+    const s = this.race.resetS;
     this.vehicle.reset(poseAt(this.stage.samples, s), VEHICLE.RESET_LIFT);
     this.race.teleportTo(s);
     this.resetCooldown = VEHICLE.RESET_COOLDOWN;
+    this.resetCount += 1;
   }
 
   /** Restarts the stage: car to spawn, cones restored, timer reset. */
@@ -89,6 +124,9 @@ export class GameSession {
     this.race.reset();
     this.accumulator = 0;
     this.resetCooldown = 0;
+    this.pendingSolidImpulse = 0;
+    this.pendingConeHits.length = 0;
+    this.hitCones.clear();
     this.physics.coneBodies.forEach((body, i) => {
       const cone = this.stage.cones[i];
       const half = cone.yaw / 2;

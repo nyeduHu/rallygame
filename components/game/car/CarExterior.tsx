@@ -3,16 +3,19 @@
 
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
-import { Mesh, type Object3D } from "three";
+import { useEffect, useMemo, useRef } from "react";
+import { Mesh, MeshBasicMaterial, type Object3D } from "three";
 import { CAR_MODEL_SCALE, CAR_MODEL_WHEEL_RADIUS, CAR_WHEEL_NODE_NAMES, MODEL_PATHS } from "@/lib/game/assets";
-import { VEHICLE } from "@/lib/game/constants";
+import { FX, VEHICLE } from "@/lib/game/constants";
 import { restingRideHeight, staticCompression } from "@/lib/game/physics/vehicle";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 
 interface CarExteriorProps {
-  session: GameSession;
+  session: SessionView;
 }
+
+/** Brake pedal level above which the lights come on. */
+const BRAKE_LIGHT_THRESHOLD = 0.1;
 
 /** Kenney wheel nodes are listed FL, FR, RL, RR to match Vehicle.wheels order. */
 const WHEEL_ORDER = CAR_WHEEL_NODE_NAMES;
@@ -56,7 +59,11 @@ export function CarExterior({ session }: CarExteriorProps) {
     });
   }, [wheels]);
 
+  const brakeLights = useRef<Array<MeshBasicMaterial | null>>([null, null]);
+
   useFrame(() => {
+    const lit = session.vehicle.drivetrain.brake > BRAKE_LIGHT_THRESHOLD || session.vehicle.handbrake;
+    brakeLights.current.forEach((material) => material?.color.set(lit ? FX.BRAKE_LIGHT_ON : FX.BRAKE_LIGHT_OFF));
     const restCompression = staticCompression();
     session.vehicle.wheels.forEach((state, i) => {
       const node: Object3D | null = wheels[i];
@@ -69,6 +76,14 @@ export function CarExterior({ session }: CarExteriorProps) {
   });
 
   return (
-    <primitive object={model} position={[0, -restingRideHeight(), 0]} scale={CAR_MODEL_SCALE} />
+    <>
+      <primitive object={model} position={[0, -restingRideHeight(), 0]} scale={CAR_MODEL_SCALE} />
+      {[1, -1].map((side, i) => (
+        <mesh key={side} position={[side * FX.BRAKE_LIGHT_POSITION[0], FX.BRAKE_LIGHT_POSITION[1], FX.BRAKE_LIGHT_POSITION[2]]}>
+          <boxGeometry args={[...FX.BRAKE_LIGHT_SIZE]} />
+          <meshBasicMaterial ref={(material) => { brakeLights.current[i] = material; }} color={FX.BRAKE_LIGHT_OFF} />
+        </mesh>
+      ))}
+    </>
   );
 }

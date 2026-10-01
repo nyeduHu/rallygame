@@ -2,6 +2,7 @@
 "use client";
 
 import { useGameStore } from "@/lib/game/store";
+import { MechanicsBars } from "./MechanicsBars";
 import { Speedometer } from "./Speedometer";
 import { StageTimer } from "./StageTimer";
 
@@ -19,6 +20,21 @@ function Countdown() {
       className="font-mono text-8xl font-black text-hud-accent drop-shadow-lg motion-safe:animate-pulse"
     >
       {Math.max(1, Math.ceil(remaining))}
+    </p>
+  );
+}
+
+/**
+ * Pit stop banner: what is still missing, then GO.
+ * @returns Banner or nothing.
+ */
+function PitBanner() {
+  const pitActive = useGameStore((state) => state.pitActive);
+  const pitReady = useGameStore((state) => state.pitReady);
+  if (!pitActive) return null;
+  return (
+    <p aria-live="polite" className="rounded-md bg-hud-surface px-4 py-2 font-mono text-lg font-bold">
+      {pitReady ? <span className="text-hud-success">GO!</span> : <span className="text-hud-accent">PIT STOP</span>}
     </p>
   );
 }
@@ -49,9 +65,11 @@ export function Hud() {
       </div>
       <div className="flex flex-col items-center gap-3">
         <Countdown />
+        <PitBanner />
         <PointerHint />
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-end justify-between">
+        <MechanicsBars />
         <Speedometer />
       </div>
     </div>

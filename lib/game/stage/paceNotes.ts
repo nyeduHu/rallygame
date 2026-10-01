@@ -38,7 +38,7 @@ export function severityForRadius(radius: number): 1 | 2 | 3 | 4 {
  * @param stage - Generated stage data.
  * @returns Ordered pace calls, including the opening straight and finish.
  */
-export function generatePaceNotes(stage: StageData): PaceNote[] {
+export function generatePaceNotes(stage: Pick<StageData, "corners" | "startS" | "finishS">): PaceNote[] {
   const corners = stage.corners
     .map((corner, cornerIndex): PositionedCorner => {
       const isHairpin = corner.classId === "hairpin";

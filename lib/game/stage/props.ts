@@ -237,3 +237,17 @@ export function placeCones(context: ScatterContext, corners: ReadonlyArray<Corne
 export function gateHalfWidth(): number {
   return SHOULDER_EDGE + GATES.SIDE_MARGIN;
 }
+
+/**
+ * Removes props within a radius of given arc positions on the road (start and finish areas).
+ * @param props - Props to filter.
+ * @param samples - Road samples (for positions).
+ * @param arcs - Arc lengths to keep clear.
+ * @param radius - Clear radius in metres.
+ * @returns Props outside every clear zone.
+ */
+export function clearAroundArcs(props: PropPlacement[], samples: ReadonlyArray<{ x: number; z: number; s: number }>, arcs: ReadonlyArray<number>, radius: number): PropPlacement[] {
+  const centres = arcs.map((arc) => samples.reduce((best, sample) => (Math.abs(sample.s - arc) < Math.abs(best.s - arc) ? sample : best), samples[0]));
+  const radiusSq = radius * radius;
+  return props.filter((prop) => centres.every((c) => (prop.x - c.x) ** 2 + (prop.z - c.z) ** 2 > radiusSq));
+}

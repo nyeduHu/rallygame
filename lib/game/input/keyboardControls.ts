@@ -1,8 +1,9 @@
 // lib/game/input/keyboardControls.ts
+import type { OnFootInput } from "../onfoot/onFootController";
 import type { DriverControls } from "../physics/vehicle";
 
 /** One-shot actions triggered on key press (not held). */
-export type KeyAction = "resetToRoad" | "toggleView" | "restart" | "interact" | "swapRole";
+export type KeyAction = "resetToRoad" | "toggleView" | "restart" | "interact" | "swapRole" | "toggleSeat";
 
 /** Key bindings from spec section 18, by physical key code so non-QWERTY layouts work. */
 const HELD_KEYS = {
@@ -18,7 +19,11 @@ const ACTION_KEYS: Readonly<Record<string, KeyAction>> = {
   KeyC: "toggleView",
   Enter: "restart",
   KeyE: "interact",
+  KeyF: "toggleSeat",
 };
+
+/** Extra held keys for walking. */
+const FOOT_KEYS = { sprintLeft: "ShiftLeft", sprintRight: "ShiftRight" } as const;
 
 /**
  * Tracks held driving keys and dispatches one-shot actions. Held state lives
@@ -39,7 +44,11 @@ export class KeyboardControls {
    */
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     const isSwapKey = this.soloMode && event.code === "Tab";
-    const isBound = Object.values(HELD_KEYS).some((code) => code === event.code) || event.code in ACTION_KEYS || isSwapKey;
+    const isBound =
+      Object.values(HELD_KEYS).some((code) => code === event.code) ||
+      Object.values(FOOT_KEYS).some((code) => code === event.code) ||
+      event.code in ACTION_KEYS ||
+      isSwapKey;
     if (!isBound) return;
     // Space would otherwise scroll or press the focused button.
     event.preventDefault();
@@ -104,6 +113,20 @@ export class KeyboardControls {
     this.roleSwapListeners.add(listener);
     return () => {
       this.roleSwapListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Reads walking keys (WASD and Shift) for the on-foot controller.
+   * @returns Held on-foot input.
+   */
+  readOnFoot(): OnFootInput {
+    return {
+      forward: this.held.has(HELD_KEYS.throttle),
+      back: this.held.has(HELD_KEYS.brake),
+      left: this.held.has(HELD_KEYS.left),
+      right: this.held.has(HELD_KEYS.right),
+      sprint: this.held.has(FOOT_KEYS.sprintLeft) || this.held.has(FOOT_KEYS.sprintRight),
     };
   }
 

@@ -6,14 +6,14 @@ import { useRef } from "react";
 import type { Group } from "three";
 import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 
 const { GEAR_LEVER, HANDBRAKE } = COCKPIT;
 const CYLINDER_SEGMENTS = 8;
 const SPHERE_SEGMENTS = 8;
 
 interface LeversProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 /**

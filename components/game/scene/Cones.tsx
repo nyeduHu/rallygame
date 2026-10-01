@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { Matrix4, Quaternion, Vector3, type InstancedMesh } from "three";
 import { MODEL_PATHS } from "@/lib/game/assets";
 import { PROPS } from "@/lib/game/constants";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import type { ModelFit, ModelPart } from "@/lib/game/three/models";
 import { useModelParts } from "./useModelParts";
 
@@ -14,12 +14,12 @@ const CONE_FIT: ModelFit = { kind: "height", height: PROPS.CONE_HEIGHT };
 const UNIT_SCALE = new Vector3(1, 1, 1);
 
 interface ConesProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 interface ConePartProps {
   part: ModelPart;
-  session: GameSession;
+  session: SessionView;
 }
 
 /**

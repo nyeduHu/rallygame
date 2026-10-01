@@ -4,6 +4,10 @@ import type { RaceSnapshot } from "./race/raceTracker";
 import type { SurfaceKind } from "./stage/types";
 import type { Role } from "./roles";
 import type { Vector3 } from "three";
+import { initialRefuel, type RefuelState } from "./refuel/refuelMachine";
+import type { RepairState } from "./repair/repairMachine";
+import { initialMechanics, type BrokenPart, type MechanicalState } from "./vehicle/mechanics";
+import type { WeatherState } from "./weather/weather";
 
 /** Car readouts shown on the HUD. */
 export interface Telemetry {
@@ -25,6 +29,41 @@ interface GameStore {
   hoveredLabel: string | null;
   interactionHitPoint: Vector3 | null;
   placeholderCubeOn: boolean;
+  mech: MechanicalState;
+  /** Role currently standing outside the car on this client, or null when seated. */
+  footRole: Role | null;
+  refuel: RefuelState;
+  setRefuel: (refuel: RefuelState) => void;
+  /** True while the team is stopped in the pit box. */
+  pitActive: boolean;
+  /** True once the server says the team may leave the pit. */
+  pitReady: boolean;
+  setPit: (pit: { pitActive: boolean; pitReady: boolean }) => void;
+  repair: RepairState;
+  setRepair: (repair: RepairState) => void;
+  /** Debug: `&fail=drive_belt` breaks that part when the stage starts (solo). */
+  failPart: BrokenPart | null;
+  /** performance.now() when the player last got back in, for the camera blend. */
+  seatedAtMs: number;
+  setFootRole: (role: Role | null) => void;
+  hoodOpen: boolean;
+  setHoodOpen: (open: boolean) => void;
+  /** Debug: `&overheat=1` drives the heat model as if flat out at a standstill. */
+  overheatForced: boolean;
+  setMech: (mech: MechanicalState) => void;
+  wipersOn: boolean;
+  weather: WeatherState;
+  /** 0..1 how clearly the driver can see through the windshield. */
+  visibility: number;
+  /** URL flags: `&rain=1` forces rain, `&debug=1` shows the visibility bar. */
+  rainForced: boolean;
+  debug: boolean;
+  /** True in an online room race (the server owns the wiper state). */
+  online: boolean;
+  setWipersOn: (on: boolean) => void;
+  setWeather: (weather: WeatherState) => void;
+  setVisibility: (visibility: number) => void;
+  setFlags: (flags: { rainForced: boolean; debug: boolean; online: boolean; overheatForced: boolean; failPart: BrokenPart | null }) => void;
   setTelemetry: (telemetry: Telemetry) => void;
   setRace: (race: RaceSnapshot) => void;
   toggleView: () => void;
@@ -61,6 +100,32 @@ export const useGameStore = create<GameStore>()((set) => ({
   hoveredLabel: null,
   interactionHitPoint: null,
   placeholderCubeOn: false,
+  mech: initialMechanics(),
+  footRole: null,
+  refuel: initialRefuel(),
+  setRefuel: (refuel) => set({ refuel }),
+  pitActive: false,
+  pitReady: false,
+  setPit: (pit) => set(pit),
+  repair: { kind: "idle" },
+  setRepair: (repair) => set({ repair }),
+  failPart: null,
+  seatedAtMs: 0,
+  setFootRole: (footRole) => set(footRole === null ? { footRole, seatedAtMs: performance.now() } : { footRole }),
+  hoodOpen: false,
+  setHoodOpen: (hoodOpen) => set({ hoodOpen }),
+  overheatForced: false,
+  setMech: (mech) => set({ mech }),
+  wipersOn: false,
+  weather: { kind: "clear", intensity: 0 },
+  visibility: 1,
+  rainForced: false,
+  debug: false,
+  online: false,
+  setWipersOn: (wipersOn) => set({ wipersOn }),
+  setWeather: (weather) => set({ weather }),
+  setVisibility: (visibility) => set({ visibility }),
+  setFlags: (flags) => set(flags),
   setTelemetry: (telemetry) => set({ telemetry }),
   setRace: (race) => set({ race }),
   toggleView: () => set((state) => ({ viewMode: state.viewMode === "cockpit" ? "chase" : "cockpit" })),

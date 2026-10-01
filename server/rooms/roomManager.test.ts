@@ -36,12 +36,14 @@ describe("room manager", () => {
     const room = manager.createRoom("Host", { maxTeams: 1 });
     const host = room.players.get(room.hostId)!;
     const team = room.createTeam("Team");
+    const token = room.issueResumeToken(host.id);
 
     room.joinTeam(host.id, team.id, "driver");
     room.disconnectPlayer(host.id, 0);
 
     expect(room.players.get(host.id)?.connected).toBe(false);
-    expect(room.resumePlayer(host.id, host.resumeToken)).toBe(true);
+    expect(room.resumePlayer(host.id, token)).toBe(true);
+    expect(room.resumePlayer(host.id, "wrong")).toBe(false);
     expect(room.players.get(host.id)?.connected).toBe(true);
 
     room.disconnectPlayer(host.id, 0);

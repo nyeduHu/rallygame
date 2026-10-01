@@ -6,7 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CanvasTexture, SRGBColorSpace, Vector3, type MeshBasicMaterial } from "three";
 import { TABLET } from "@/lib/game/constants";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import { PALETTE } from "@/lib/game/palette";
 import { generatePaceNotes } from "@/lib/game/stage/paceNotes";
 import { RoadIndex, poseAt } from "@/lib/game/stage/roadIndex";
@@ -26,7 +26,7 @@ import {
 type TabletMode = "NEXT" | "OVERVIEW";
 
 interface TabletProps {
-  session: GameSession;
+  session: SessionView;
   activeRole: Role;
 }
 
@@ -156,7 +156,7 @@ function mapViewport(): MapViewport {
  * @returns Quantized key for all visible dynamic tablet content.
  */
 function getTabletContentKey(
-  session: GameSession,
+  session: SessionView,
   notes: ReadonlyArray<PaceNote>,
   roadIndex: RoadIndex,
   overviewRoad: ReadonlyArray<MapPoint>,
@@ -208,7 +208,7 @@ function getTabletContentKey(
  */
 function drawTablet(
   canvas: HTMLCanvasElement,
-  session: GameSession,
+  session: SessionView,
   notes: ReadonlyArray<PaceNote>,
   roadIndex: RoadIndex,
   overviewRoad: ReadonlyArray<MapPoint>,
@@ -334,7 +334,7 @@ function drawRoad(context: CanvasRenderingContext2D, points: ReadonlyArray<MapPo
  */
 function drawStartFinish(
   context: CanvasRenderingContext2D,
-  stage: GameSession["stage"],
+  stage: SessionView["stage"],
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {
   const start = poseAt(stage.samples, stage.startS);
@@ -393,7 +393,7 @@ function drawDot(context: CanvasRenderingContext2D, point: MapPoint, color: stri
 function drawCheckpoints(
   context: CanvasRenderingContext2D,
   checkpointDistances: ReadonlyArray<number>,
-  samples: GameSession["stage"]["samples"],
+  samples: SessionView["stage"]["samples"],
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {
   context.strokeStyle = PALETTE.lever;
@@ -418,7 +418,7 @@ function drawCheckpoints(
  */
 function drawDirectionArrows(
   context: CanvasRenderingContext2D,
-  samples: GameSession["stage"]["samples"],
+  samples: SessionView["stage"]["samples"],
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {
   if (samples.length === 0) return;
@@ -454,7 +454,7 @@ function drawDirectionArrows(
  */
 function drawDistanceTicks(
   context: CanvasRenderingContext2D,
-  stage: GameSession["stage"],
+  stage: SessionView["stage"],
   progress: number,
   mode: TabletMode,
   toPoint: (point: MapWorldPoint) => MapPoint,
@@ -483,7 +483,7 @@ function drawDistanceTicks(
  */
 function drawCornerMarkers(
   context: CanvasRenderingContext2D,
-  stage: GameSession["stage"],
+  stage: SessionView["stage"],
   notes: ReadonlyArray<PaceNote>,
   toPoint: (point: MapWorldPoint) => MapPoint,
 ): void {

@@ -4,15 +4,16 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
 import { useGameStore } from "@/lib/game/store";
 import { FRAME_PRIORITY } from "../scene/framePriority";
 import type { Role } from "@/lib/game/roles";
 import { CarExterior } from "./CarExterior";
+import { EngineBay } from "../repair/EngineBay";
 import { Cockpit } from "./Cockpit";
 
 interface CarRigProps {
-  session: GameSession;
+  session: SessionView;
   role: Role;
   solo: boolean;
 }
@@ -27,6 +28,7 @@ export function CarRig({ session, role, solo }: CarRigProps) {
   const groupRef = useRef<Group>(null);
   const viewMode = useGameStore((state) => state.viewMode);
   const soloActiveRole = useGameStore((state) => state.soloActiveRole);
+  const footRole = useGameStore((state) => state.footRole);
   const activeRole = solo ? soloActiveRole : role;
 
   useFrame(() => {
@@ -38,7 +40,8 @@ export function CarRig({ session, role, solo }: CarRigProps) {
 
   return (
     <group ref={groupRef} name="car">
-      {viewMode === "cockpit" ? (
+      <EngineBay />
+      {viewMode === "cockpit" && footRole === null ? (
         <Cockpit session={session} activeRole={activeRole} />
       ) : (
         <CarExterior session={session} />

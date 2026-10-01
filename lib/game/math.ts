@@ -57,3 +57,15 @@ export function wrapAngle(angle: number): number {
   if (wrapped <= -Math.PI) wrapped += twoPi;
   return wrapped;
 }
+
+/**
+ * Frame-rate independent exponential smoothing toward a target.
+ * @param current - Current value.
+ * @param target - Target value.
+ * @param rate - Smoothing rate in 1/s (higher is snappier).
+ * @param dt - Frame time in seconds.
+ * @returns The smoothed value.
+ */
+export function damp(current: number, target: number, rate: number, dt: number): number {
+  return lerp(current, target, 1 - Math.exp(-rate * dt));
+}

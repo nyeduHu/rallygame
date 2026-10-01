@@ -3,13 +3,17 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
-import { Vector3, type DirectionalLight } from "three";
-import { RENDER } from "@/lib/game/constants";
+import { Color, Fog, Vector3, type DirectionalLight } from "three";
+import { RENDER, WEATHER } from "@/lib/game/constants";
+import { lerp } from "@/lib/game/math";
+import { useGameStore } from "@/lib/game/store";
 import { PALETTE } from "@/lib/game/palette";
-import type { GameSession } from "@/lib/game/session";
+import type { SessionView } from "@/lib/game/sessionView";
+
+const RAIN_FOG_COLOR = new Color(WEATHER.RAIN_FOG_COLOR);
 
 interface LightingProps {
-  session: GameSession;
+  session: SessionView;
 }
 
 const SUN_OFFSET = new Vector3(RENDER.SUN_DIRECTION.x, RENDER.SUN_DIRECTION.y, RENDER.SUN_DIRECTION.z)
@@ -38,7 +42,16 @@ export function Lighting({ session }: LightingProps) {
     camera.updateProjectionMatrix();
   }, []);
 
-  useFrame(() => {
+  useFrame(({ scene }) => {
+    const fog = scene.fog;
+    if (fog instanceof Fog) {
+      const rain = useGameStore.getState().weather;
+      const t = rain.kind === "rain" ? rain.intensity : 0;
+      fog.color.set(PALETTE.sky).lerp(RAIN_FOG_COLOR, t);
+      fog.near = lerp(RENDER.FOG_NEAR, WEATHER.RAIN_FOG_NEAR, t);
+      fog.far = lerp(RENDER.FOG_FAR, WEATHER.RAIN_FOG_FAR, t);
+      if (scene.background instanceof Color) scene.background.copy(fog.color);
+    }
     const sun = sunRef.current;
     if (!sun) return;
     const car = session.renderPosition;

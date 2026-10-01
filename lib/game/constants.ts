@@ -26,6 +26,12 @@ export const SEED = {
   MAX_SEED_DIGITS: 9,
   /** Mixes the retry attempt into the seed so retries stay deterministic. */
   ATTEMPT_SALT: 0x9e3779b1,
+  /** Salt for the per-stage weather plan. */
+  WEATHER_SALT: 0x57ea7e5,
+  /** Salt for the seeded part-failure stream. */
+  FAILURES_SALT: 0xfa11ed,
+  /** Salt for pit placement (reserved: placement is deterministic from the road, not random). */
+  PIT_SALT: 0x91750,
 } as const;
 
 /** Road layout and validation. */
@@ -54,6 +60,11 @@ export const ROAD = {
   /** Hairpins are only allowed when the road is roughly on its main heading. */
   HAIRPIN_HEADING_LIMIT: 30 * DEG_TO_RAD,
   MAX_GENERATION_ATTEMPTS: 60,
+  /** No corner may be tighter than this radius. */
+  MIN_RADIUS: 12,
+  /** Minimum straight between consecutive corners, except deliberate linked corners. */
+  MIN_STRAIGHT_BETWEEN: 20,
+  MIN_LINK_STRAIGHT: 6,
   MIN_CORNERS: 8,
   MIN_SEVERE_CORNERS: 1,
   /** Non-adjacent road parts must stay this far apart (centreline to centreline). */
@@ -100,6 +111,8 @@ export const TERRAIN = {
 
 /** Prop scattering. */
 export const PROPS = {
+  /** Props are removed within this radius of the start and finish lines. */
+  MIN_CLEAR_RADIUS_START: 30,
   TREE_GRID: 7.5,
   TREE_JITTER: 0.85,
   TREE_FILL_CHANCE: 0.7,
@@ -150,12 +163,22 @@ export const GATES = {
   TOWER_OFFSET: 4.7,
   /** Half extents of bannerTowerGreen after height normalisation to TOWER_HEIGHT. */
   TOWER_HALF_EXTENTS: { x: 0.93, y: 3, z: 0.93 },
+  /** Gates ignore fog so they stay visible from this far. */
+  VISIBLE_DISTANCE_M: 900,
   /** Lateral tolerance for a checkpoint crossing to count. */
   DETECTION_HALF_WIDTH: 12,
+  /** Progress beyond a gate by this much without crossing it counts as a missed gate. */
+  MISS_MARGIN: 10,
+  /** A reset after a missed gate puts the car this far before the gate. */
+  RESET_BEFORE_GATE: 15,
 } as const;
 
 /** Pace-note classification and callout distances. */
 export const PACE_NOTES = {
+  /** Longest note text the co-driver tablet and voice can handle. */
+  MAX_TEXT_LENGTH: 28,
+  /** More notes than this per 100 m cannot be read aloud. */
+  MAX_NOTES_PER_100M: 3,
   SEVERITY_BANDS: [
     { minimumRadius: 140, severity: 1 },
     { minimumRadius: 80, severity: 2 },
@@ -263,6 +286,9 @@ export const AUTOPILOT = {
   MAX_LATERAL_ACCELERATION: 4.5,
   BRAKING_DECELERATION: 4,
   SPEED_MARGIN_MS: 0.5,
+  /** Below this speed the car counts as stuck, like a human reaching for the reset key. */
+  STUCK_SPEED_MS: 0.5,
+  STUCK_SECONDS: 3,
   TUNED_FRONT_GRIP: 1.01,
   BASELINE_SEED: 847291,
 } as const;
@@ -413,4 +439,286 @@ export const UNITS = {
   MS_TO_KMH: 3.6,
   RAD_PER_SEC_TO_RPM: 60 / (2 * Math.PI),
   MS_PER_SECOND: 1000,
+} as const;
+
+/** Rain and windshield dirt model (shared with the server). */
+export const WEATHER = {
+  /** About 22 s from clear to opaque at full intensity. */
+  DIRT_RATE_PER_SECOND_AT_FULL_INTENSITY: 0.045,
+  /** Faster driving collects more drops. */
+  SPEED_DIRT_BONUS_PER_MS: 0.0006,
+  /** Dirt below this does not hurt visibility. */
+  DIRT_VISIBLE_START: 0.2,
+  /** The windshield never goes fully black. */
+  MIN_VISIBILITY: 0.08,
+  MAX_RAIN_PARTICLES: 1500,
+  /** URL `&rain=1` forces rain from this race time. */
+  FORCED_RAIN_START_SECONDS: 10,
+  /** Seconds into a later stage at which seeded rain begins (range). */
+  PLANNED_RAIN_START_MIN_SECONDS: 20,
+  PLANNED_RAIN_START_SPAN_SECONDS: 60,
+  /** Chance that a stage after the tutorial has rain. */
+  PLANNED_RAIN_CHANCE: 0.5,
+  PLANNED_RAIN_MIN_INTENSITY: 0.5,
+  RAIN_BOX_SIZE: 30,
+  RAIN_BOX_HEIGHT: 18,
+  RAIN_FALL_SPEED: 22,
+  RAIN_POINT_SIZE: 0.12,
+  RAIN_COLOR: "#b8c6d6",
+  /** Fog colour and range at full rain intensity. */
+  RAIN_FOG_COLOR: "#7d8794",
+  RAIN_FOG_NEAR: 25,
+  RAIN_FOG_FAR: 220,
+} as const;
+
+/** Windshield wipers. */
+export const WIPERS = {
+  WIPE_RATE_PER_SECOND: 0.35,
+  /** Peak sweep of each blade in radians (about 80 degrees). */
+  SWEEP_ANGLE: 1.4,
+  /** Blade sweeps per second while on. */
+  SWEEPS_PER_SECOND: 0.9,
+  BLADE_LENGTH: 0.55,
+  BLADE_THICKNESS: 0.025,
+  /** Switch lever tilt (radians) when on, and its damping. */
+  SWITCH_ON_TILT: 0.5,
+  SWITCH_DAMPING: 14,
+} as const;
+
+/**
+ * Engine, fuel, temperature and damage model. Fuel calc: stages run about 170 s at the slowest;
+ * 1.35 x 230 s of "moderate load" (throttle x rpm = 0.4) must fit in one tank, so
+ * FUEL_IDLE + FUEL_PER_LOAD x 0.4 = 0.42 units/s stays under TANK / 230 = 0.435 units/s.
+ */
+export const MECHANICS = {
+  TANK_CAPACITY_UNITS: 100,
+  FUEL_IDLE: 0.1,
+  FUEL_PER_LOAD: 0.8,
+  FUEL_RANGE_MULTIPLIER: 1.35,
+  HEAT_PER_LOAD: 0.05,
+  HEAT_DAMAGE: 0.03,
+  COOL_BASE: 0.01,
+  COOL_PER_SPEED: 0.04,
+  COOL_HOOD_OPEN: 0.06,
+  COOL_PER_AMBIENT: 0.01,
+  MAX_SPEED_MS: 30,
+  OVERHEAT_WARN: 0.85,
+  OVERHEAT_FAIL: 1,
+  OVERHEAT_FAIL_SECONDS: 6,
+  /** Overheat clears below this temperature. */
+  OVERHEAT_RECOVER: 0.6,
+  OVERHEAT_POWER_FLOOR: 0.55,
+  HEALTH_LOSS_OVERHEAT_PER_S: 0.02,
+  /** Engine health lost per newton-second of impact beyond the free threshold. */
+  HEALTH_PER_IMPULSE: 1 / 90000,
+  /** Impacts below this are free (kerbs, cones). */
+  IMPACT_FREE_THRESHOLD: 1500,
+  DAMAGE_PER_IMPULSE: 1 / 60000,
+  /** A crash is an impact at least this hard. */
+  CRASH_IMPULSE: 8000,
+  P_BREAK_ON_CRASH: 0.5,
+  /** Power lost at full body damage. */
+  DAMAGE_POWER_LOSS: 0.3,
+  TIRE_WEAR_PER_S_GRAVEL: 0.0005,
+  TIRE_WEAR_PER_S_GRASS: 0.0012,
+  DEFAULT_AMBIENT: 0.5,
+  /** Per-step velocity change below this is normal driving, not an impact. */
+  IMPACT_MIN_DELTA_V: 0.35,
+  /** A cone moving faster than this has been hit. */
+  CONE_HIT_SPEED: 1.5,
+} as const;
+
+/** On-foot player (leaving the car, pit work). */
+export const ON_FOOT = {
+  /** Car must be slower than this to get out. */
+  EXIT_MAX_SPEED_MS: 0.6,
+  CAPSULE_RADIUS: 0.3,
+  CAPSULE_HALF_HEIGHT: 0.6,
+  EYE_HEIGHT: 1.6,
+  WALK_SPEED_MS: 3.2,
+  SPRINT_MULTIPLIER: 1.8,
+  STEP_HEIGHT: 0.4,
+  STEP_MIN_WIDTH: 0.2,
+  /** Steepest slope (radians) the player can walk up. */
+  MAX_SLOPE_RADIANS: 0.9,
+  MAX_PITCH: 85 * (Math.PI / 180),
+  /** Sprinting speed used by the server as the plausibility limit (x1.5 slack on top). */
+  MAX_SPEED_MS: 3.2 * 1.8,
+  MAX_DISTANCE_FROM_CAR_M: 60,
+  ENTER_RADIUS_M: 2.2,
+  ENTER_BLEND_S: 0.35,
+  /** Door position relative to the car centre along local x (driver +x, passenger -x). */
+  DOOR_OFFSET_X: 1.3,
+  DOOR_OFFSET_Z: 0,
+  /** Where a player appears when leaving the car, beside the door. */
+  EXIT_OFFSET_X: 1.6,
+  EXIT_LIFT: 0.3,
+  GRAVITY: -9.81,
+  /** Body colours/height used for other players' low-poly characters. */
+  BODY_RADIUS: 0.28,
+  BODY_HEIGHT: 1.1,
+  HEAD_RADIUS: 0.2,
+  SERVER_SPEED_SLACK: 1.5,
+} as const;
+
+/** Repair mini-game rules (spec 4.2, 19). */
+export const REPAIR = {
+  WRONG_GUESS_SECONDS: 3,
+  WRONG_PART_SECONDS: 5,
+  /** Engine health restored by a completed repair. */
+  RESTORED_HEALTH: 0.6,
+  CAP_TURNS: 1.5,
+  /** Pointer drag that counts as one turn of the radiator cap. */
+  CAP_PX_PER_TURN: 160,
+  HOOD_HOLD_S: 0.8,
+  REMOVE_DRAG_PX: 120,
+  INSTALL_DRAG_PX: 90,
+  WATER_HOLD_S: 3,
+  /** Cooling with water drops the temperature to this level. */
+  COOLED_TEMPERATURE: 0.4,
+  /** Player must be within this distance of the car to work on it. */
+  MAX_DISTANCE_M: 6,
+  /** Hood opens to this angle (radians). */
+  HOOD_OPEN_ANGLE: 1.05,
+  HOOD_DAMPING: 8,
+} as const;
+
+/** Pit stop placement and flow (spec 7, 8). */
+export const PIT = {
+  /** Allowed band of the stage (fractions of stage length). */
+  BAND_START: 0.45,
+  BAND_END: 0.65,
+  MIN_STRAIGHT_METRES: 120,
+  MIN_CLEARANCE_FROM_CORNER_M: 60,
+  /** Fallback when no straight gives the full clearance: the longest gap, but never closer than this. */
+  FALLBACK_CLEARANCE_M: 15,
+  /** Box dimensions: x across the road, z along it. */
+  BOX_SIZE: { x: 7, z: 14 },
+  /** Gap between the road shoulder edge and the box. */
+  BOX_GAP: 0.5,
+  /** Pump distance beyond the outer edge of the box. */
+  PUMP_OFFSET: 1.6,
+  /** Props within this margin of the box (and pump) are removed. */
+  CLEAR_MARGIN: 3,
+  MAX_ENTRY_SPEED_MS: 2,
+  MIN_FUEL_TO_RELEASE: 0.9,
+} as const;
+
+/** Refuelling hardware (co-driver, spec 7). */
+export const REFUEL = {
+  HOSE_LENGTH_M: 8,
+  LITRES_PER_SECOND: 2.5,
+  /** Litres a full tank holds (equal to MECHANICS.TANK_CAPACITY_UNITS). */
+  TANK_LITRES: 100,
+  OVERFLOW_AT: 1,
+  TANGLE_PENALTY_S: 4,
+  SPILL_PENALTY_S: 3,
+  /** Co-driver must be within this distance of the car flap or pump to act. */
+  MAX_DISTANCE_M: 3,
+  /** Fuel flap position on the car (car-local: right/passenger side rear). */
+  FLAP_LOCAL: [-1.0, 0.45, -1.3] as readonly [number, number, number],
+} as const;
+
+/** Checkpoint spacing limits. */
+export const CHECKPOINT = {
+  MIN_SPACING: 300,
+  MAX_SPACING: 900,
+  /** Checkpoints keep at least this far from a hairpin apex. */
+  MIN_DISTANCE_FROM_HAIRPIN_APEX: 20,
+} as const;
+
+/**
+ * Difficulty windows by stage index. Score = sum of corner severity weights; stage 0 is the
+ * low-difficulty tutorial. A stage outside its window is rejected and regenerated.
+ */
+export const DIFFICULTY = {
+  SEVERITY_WEIGHT: { hairpin: 4, tight: 3, medium: 2, fast: 1 },
+  STAGE: [
+    { min: 28, max: 41 },
+    { min: 34, max: 50 },
+    { min: 40, max: 62 },
+  ],
+  /** Stage 0 never has two hairpins closer than this along the road. */
+  STAGE0_HAIRPIN_SPACING: 300,
+} as const;
+
+/** Roadside distance posts (non-solid). */
+export const POSTS = {
+  SPACING_M: 500,
+  SIZE: [0.25, 1.4, 0.25] as const,
+  PLATE_SIZE: [0.9, 0.5] as const,
+  /** Distance beyond the shoulder edge. */
+  OFFSET: 1.2,
+  TEXTURE_PX: 128,
+  PLATE_COLOR: "#f6f3ea",
+  TEXT_COLOR: "#1c1d21",
+  POST_COLOR: "#7d828c",
+} as const;
+
+/** Procedural audio (Web Audio only; no sample assets). */
+export const ENGINE_SOUND = {
+  BASE_HZ: 38,
+  HZ_PER_RPM: 0.03,
+  SQUARE_DETUNE_CENTS: 12,
+  SQUARE_GAIN: 0.35,
+  LOWPASS_BASE_HZ: 380,
+  LOWPASS_PER_RPM_HZ: 0.12,
+  IDLE_GAIN: 0.12,
+  THROTTLE_GAIN: 0.2,
+  RUMBLE_GAIN: 0.06,
+  RUMBLE_LOWPASS_HZ: 180,
+  /** Gain smoothing time constant (s) so changes never click. */
+  SMOOTHING_S: 0.05,
+  GRAVEL_FULL_SLIP_MS: 6,
+  GRAVEL_MAX_GAIN: 0.22,
+  GRAVEL_BAND_HZ: 1400,
+  GRAVEL_ROLL_GAIN: 0.05,
+  GRASS_FACTOR: 0.6,
+  THUD_GAIN: 0.5,
+  THUD_SECONDS: 0.25,
+  THUD_FULL_IMPULSE: 20000,
+  BEEP_HZ: 880,
+  BEEP_SECONDS: 0.12,
+  BEEP_GAP_SECONDS: 0.2,
+  BEEP_GAIN: 0.12,
+  BUZZ_HZ: 160,
+  BUZZ_SECONDS: 1.2,
+  RAIN_GAIN: 0.18,
+  RAIN_LOWPASS_HZ: 1800,
+  WIPER_THUNK_GAIN: 0.2,
+  MASTER_GAIN: 0.8,
+  STORAGE_KEY: "rally-muted",
+} as const;
+
+/** Visual effects. */
+export const FX = {
+  MAX_DUST_PARTICLES: 600,
+  DUST_LIFETIME_S: 1.6,
+  DUST_RISE_SPEED: 0.8,
+  DUST_SIZE: 0.9,
+  DUST_COLOR: "#b89c74",
+  /** Dust is emitted above this speed on gravel. */
+  DUST_MIN_SPEED_MS: 4,
+  /** Particles spawned per second at 30 m/s. */
+  DUST_RATE_AT_30MS: 80,
+  MAX_SKID_SEGMENTS: 400,
+  /** Slip speed above which tyres leave marks. */
+  SKID_MIN_SLIP_MS: 2.5,
+  SKID_WIDTH: 0.22,
+  SKID_LENGTH: 0.6,
+  SKID_LIFT: 0.03,
+  SKID_COLOR: "#2b2a28",
+  SKID_SPACING_M: 0.5,
+  BRAKE_LIGHT_ON: "#ff2a1a",
+  BRAKE_LIGHT_OFF: "#4a0d0a",
+  BRAKE_LIGHT_SIZE: [0.22, 0.08, 0.04] as const,
+  BRAKE_LIGHT_POSITION: [0.55, 0.45, -2.08] as const,
+  /** Screen shake. */
+  SHAKE_FULL_IMPULSE: 20000,
+  SHAKE_MAX_METRES: 0.12,
+  SHAKE_MAX_RADIANS: 0.03,
+  SHAKE_DECAY_PER_S: 3.5,
+  SHAKE_FREQUENCY_HZ: 24,
+  SMOKE_WHITE: "#e6e8ec",
+  SMOKE_BLACK: "#1c1d21",
 } as const;

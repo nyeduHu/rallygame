@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { MeshStandardMaterial } from "three";
 import { MODEL_PATHS } from "@/lib/game/assets";
 import { GATES, ROAD } from "@/lib/game/constants";
 import { gateHalfWidth } from "@/lib/game/stage/props";
@@ -28,10 +29,20 @@ interface StaticModelProps {
  * @returns Group of meshes.
  */
 function StaticModel({ parts, position, yaw }: StaticModelProps) {
+  // Gates ignore fog so they stay visible from GATES.VISIBLE_DISTANCE_M away.
+  const materials = useMemo(
+    () =>
+      parts.map((part) => {
+        const material = part.material.clone();
+        if (material instanceof MeshStandardMaterial) material.fog = false;
+        return material;
+      }),
+    [parts],
+  );
   return (
     <group position={[position[0], position[1], position[2]]} rotation={[0, yaw, 0]}>
       {parts.map((part, i) => (
-        <mesh key={i} geometry={part.geometry} material={part.material} castShadow receiveShadow />
+        <mesh key={i} geometry={part.geometry} material={materials[i]} castShadow receiveShadow />
       ))}
     </group>
   );
