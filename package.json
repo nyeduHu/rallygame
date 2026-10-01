@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5500",
     "server": "tsx watch server/index.ts",
     "dev:all": "concurrently -n web,server \"npm:dev\" \"npm:server\"",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 5500",
     "lint": "eslint",
     "test": "vitest run"
   },

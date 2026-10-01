@@ -10,7 +10,7 @@ export class RallyClient {
   private socket: Socket | null = null;
 
   /** Connects by using the server URL from environment or default localhost. */
-  connect(url = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000"): Socket {
+  connect(url = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:5501"): Socket {
     this.socket = io(url, {
       autoConnect: true,
       transports: ["websocket"],
@@ -21,7 +21,7 @@ export class RallyClient {
   /** Returns the active socket or a connected instance. */
   getSocket(): Socket {
     if (!this.socket) {
-      this.socket = io(process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000", {
+      this.socket = io(process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:5501", {
         autoConnect: true,
         transports: ["websocket"],
       });
