@@ -26,6 +26,8 @@ export const SEED = {
   MAX_SEED_DIGITS: 9,
   /** Mixes the retry attempt into the seed so retries stay deterministic. */
   ATTEMPT_SALT: 0x9e3779b1,
+  /** Salt for the per-stage weather plan. */
+  WEATHER_SALT: 0x57ea7e5,
 } as const;
 
 /** Road layout and validation. */
@@ -420,4 +422,48 @@ export const UNITS = {
   MS_TO_KMH: 3.6,
   RAD_PER_SEC_TO_RPM: 60 / (2 * Math.PI),
   MS_PER_SECOND: 1000,
+} as const;
+
+/** Rain and windshield dirt model (shared with the server). */
+export const WEATHER = {
+  /** About 22 s from clear to opaque at full intensity. */
+  DIRT_RATE_PER_SECOND_AT_FULL_INTENSITY: 0.045,
+  /** Faster driving collects more drops. */
+  SPEED_DIRT_BONUS_PER_MS: 0.0006,
+  /** Dirt below this does not hurt visibility. */
+  DIRT_VISIBLE_START: 0.2,
+  /** The windshield never goes fully black. */
+  MIN_VISIBILITY: 0.08,
+  MAX_RAIN_PARTICLES: 1500,
+  /** URL `&rain=1` forces rain from this race time. */
+  FORCED_RAIN_START_SECONDS: 10,
+  /** Seconds into a later stage at which seeded rain begins (range). */
+  PLANNED_RAIN_START_MIN_SECONDS: 20,
+  PLANNED_RAIN_START_SPAN_SECONDS: 60,
+  /** Chance that a stage after the tutorial has rain. */
+  PLANNED_RAIN_CHANCE: 0.5,
+  PLANNED_RAIN_MIN_INTENSITY: 0.5,
+  RAIN_BOX_SIZE: 30,
+  RAIN_BOX_HEIGHT: 18,
+  RAIN_FALL_SPEED: 22,
+  RAIN_POINT_SIZE: 0.12,
+  RAIN_COLOR: "#b8c6d6",
+  /** Fog colour and range at full rain intensity. */
+  RAIN_FOG_COLOR: "#7d8794",
+  RAIN_FOG_NEAR: 25,
+  RAIN_FOG_FAR: 220,
+} as const;
+
+/** Windshield wipers. */
+export const WIPERS = {
+  WIPE_RATE_PER_SECOND: 0.35,
+  /** Peak sweep of each blade in radians (about 80 degrees). */
+  SWEEP_ANGLE: 1.4,
+  /** Blade sweeps per second while on. */
+  SWEEPS_PER_SECOND: 0.9,
+  BLADE_LENGTH: 0.55,
+  BLADE_THICKNESS: 0.025,
+  /** Switch lever tilt (radians) when on, and its damping. */
+  SWITCH_ON_TILT: 0.5,
+  SWITCH_DAMPING: 14,
 } as const;

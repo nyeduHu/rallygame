@@ -17,7 +17,9 @@ import { Cones } from "./Cones";
 import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
+import { Rain } from "./Rain";
 import { RemoteDriver } from "./RemoteDriver";
+import { WeatherDriver } from "./WeatherDriver";
 import { SimulationDriver } from "./SimulationDriver";
 import { GhostCars } from "./GhostCars";
 import { NetDriver } from "./NetDriver";
@@ -90,6 +92,8 @@ export function GameScene({
       {session instanceof RemoteSession && online && <RemoteDriver session={session} teamId={online.ownTeamId} />}
       {online && role === "driver" && session instanceof GameSession && <NetDriver session={session} />}
       {online && <GhostCars teamIds={online.remoteTeamIds} />}
+      <WeatherDriver session={session} ownTeamId={online?.ownTeamId} />
+      <Rain />
       <ReadySignal onReady={onReady} />
     </InteractionDriver>
   );

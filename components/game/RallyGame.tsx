@@ -16,6 +16,7 @@ import { LoadingScreen } from "./overlays/LoadingScreen";
 import { StartOverlay } from "./overlays/StartOverlay";
 import { TuningPanel } from "./hud/TuningPanel";
 import { Crosshair } from "./hud/Crosshair";
+import { VisibilityBar } from "./hud/VisibilityBar";
 import { GameScene } from "./scene/GameScene";
 import { GameSession } from "@/lib/game/session";
 import { useGameSession } from "./useGameSession";
@@ -80,6 +81,15 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
   useEffect(() => () => mouseLook.detach(), [mouseLook]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    useGameStore.getState().setFlags({
+      rainForced: params.get("rain") === "1",
+      debug: params.get("debug") === "1",
+      online: online !== undefined,
+    });
+  }, [online]);
+
+  useEffect(() => {
     setTuningEnabled(showTuningPanel);
     return () => setTuningEnabled(false);
   }, [showTuningPanel]);
@@ -132,6 +142,7 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
         <>
           <Hud />
           <Crosshair />
+          <VisibilityBar />
           {showTuningPanel && <TuningPanel />}
           {phase === "ready" && !online && (
             <StartOverlay

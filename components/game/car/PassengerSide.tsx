@@ -13,6 +13,7 @@ import type { Role } from "@/lib/game/roles";
 import { useGameStore } from "@/lib/game/store";
 import { Beam, beamTransform } from "./Beam";
 import { Tablet } from "./Tablet";
+import { WiperSwitch } from "./WiperSwitch";
 import { Interactable } from "../interaction/Interactable";
 
 type Vec3 = readonly [number, number, number];
@@ -23,7 +24,7 @@ interface PassengerSideProps {
 }
 
 const CYLINDER_SEGMENTS = 8;
-const { PASSENGER_DASH_PAD, PASSENGER_GLOVEBOX, PASSENGER_WIPER_SWITCH, PASSENGER_TABLET_MOUNT } = COCKPIT;
+const { PASSENGER_DASH_PAD, PASSENGER_GLOVEBOX, PASSENGER_TABLET_MOUNT } = COCKPIT;
 
 interface BoxPartProps {
   position: Vec3;
@@ -136,18 +137,7 @@ export function PassengerSide({ session, activeRole }: PassengerSideProps) {
         color={PALETTE.lever}
       />
 
-      <group name="passenger-wiper-switch">
-        <BoxPart
-          position={PASSENGER_WIPER_SWITCH.BASE_POSITION}
-          size={PASSENGER_WIPER_SWITCH.BASE_SIZE}
-          color={PALETTE.interior}
-        />
-        <BoxPart
-          position={PASSENGER_WIPER_SWITCH.LEVER_POSITION}
-          size={PASSENGER_WIPER_SWITCH.LEVER_SIZE}
-          color={PALETTE.lever}
-        />
-      </group>
+      <WiperSwitch />
 
       <group name="passenger-tablet-mount" visible={activeRole === "codriver"}>
         <BoxPart

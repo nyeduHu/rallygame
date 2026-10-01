@@ -4,6 +4,7 @@ import type { RaceSnapshot } from "./race/raceTracker";
 import type { SurfaceKind } from "./stage/types";
 import type { Role } from "./roles";
 import type { Vector3 } from "three";
+import type { WeatherState } from "./weather/weather";
 
 /** Car readouts shown on the HUD. */
 export interface Telemetry {
@@ -25,6 +26,19 @@ interface GameStore {
   hoveredLabel: string | null;
   interactionHitPoint: Vector3 | null;
   placeholderCubeOn: boolean;
+  wipersOn: boolean;
+  weather: WeatherState;
+  /** 0..1 how clearly the driver can see through the windshield. */
+  visibility: number;
+  /** URL flags: `&rain=1` forces rain, `&debug=1` shows the visibility bar. */
+  rainForced: boolean;
+  debug: boolean;
+  /** True in an online room race (the server owns the wiper state). */
+  online: boolean;
+  setWipersOn: (on: boolean) => void;
+  setWeather: (weather: WeatherState) => void;
+  setVisibility: (visibility: number) => void;
+  setFlags: (flags: { rainForced: boolean; debug: boolean; online: boolean }) => void;
   setTelemetry: (telemetry: Telemetry) => void;
   setRace: (race: RaceSnapshot) => void;
   toggleView: () => void;
@@ -61,6 +75,16 @@ export const useGameStore = create<GameStore>()((set) => ({
   hoveredLabel: null,
   interactionHitPoint: null,
   placeholderCubeOn: false,
+  wipersOn: false,
+  weather: { kind: "clear", intensity: 0 },
+  visibility: 1,
+  rainForced: false,
+  debug: false,
+  online: false,
+  setWipersOn: (wipersOn) => set({ wipersOn }),
+  setWeather: (weather) => set({ weather }),
+  setVisibility: (visibility) => set({ visibility }),
+  setFlags: (flags) => set(flags),
   setTelemetry: (telemetry) => set({ telemetry }),
   setRace: (race) => set({ race }),
   toggleView: () => set((state) => ({ viewMode: state.viewMode === "cockpit" ? "chase" : "cockpit" })),

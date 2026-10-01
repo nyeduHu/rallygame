@@ -8,6 +8,8 @@ import { Gauges } from "./Gauges";
 import { Levers } from "./Levers";
 import { PassengerSide } from "./PassengerSide";
 import { SteeringWheel } from "./SteeringWheel";
+import { WindshieldGlass } from "./WindshieldGlass";
+import { Wipers } from "./Wipers";
 
 interface CockpitProps {
   session: SessionView;
@@ -24,6 +26,8 @@ export function Cockpit({ session, activeRole }: CockpitProps) {
   return (
     <group name="cockpit">
       <CockpitShell />
+      <WindshieldGlass />
+      <Wipers />
       <Gauges session={session} />
       <SteeringWheel session={session} />
       <Levers session={session} />
