@@ -84,6 +84,12 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
             <button type="submit" disabled={!connected} className="rounded bg-emerald-500 px-4 py-3 font-medium text-slate-950 disabled:opacity-50">
               {code === NEW_ROOM_SLUG ? "CREATE RALLY" : "JOIN RALLY"}
             </button>
+            {!connected && (
+              <p role="alert" className="text-amber-300">
+                Can&apos;t reach the game server. Start it with <code className="font-mono">npm run dev:all</code> (runs the
+                web app and the server on port 4000), then reload.
+              </p>
+            )}
             {error && <p role="alert" className="text-red-400">{error}</p>}
           </form>
         )}
