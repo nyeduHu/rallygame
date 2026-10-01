@@ -18,6 +18,7 @@ import { TuningPanel } from "./hud/TuningPanel";
 import { Crosshair } from "./hud/Crosshair";
 import { VisibilityBar } from "./hud/VisibilityBar";
 import { GameScene } from "./scene/GameScene";
+import type { BrokenPart } from "@/lib/game/vehicle/mechanics";
 import { GameSession } from "@/lib/game/session";
 import { useGameSession } from "./useGameSession";
 
@@ -30,6 +31,11 @@ interface RallyGameProps {
 }
 
 const METRES_PER_KM = 1000;
+
+/** @returns The broken part named in the URL, or null. */
+function parseBrokenPart(raw: string | null): BrokenPart | null {
+  return raw === "radiator_hose" || raw === "spark_plug" || raw === "drive_belt" ? raw : null;
+}
 const KM_DECIMALS = 1;
 const CAMERA_SETTINGS = { fov: CAMERA.FOV, near: CAMERA.NEAR, far: CAMERA.FAR } as const;
 const PIXEL_RATIO: [number, number] = [1, RENDER.MAX_PIXEL_RATIO];
@@ -87,6 +93,7 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
       debug: params.get("debug") === "1",
       online: online !== undefined,
       overheatForced: params.get("overheat") === "1",
+      failPart: parseBrokenPart(params.get("fail")),
     });
   }, [online]);
 

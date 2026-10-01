@@ -4,7 +4,8 @@ import type { RaceSnapshot } from "./race/raceTracker";
 import type { SurfaceKind } from "./stage/types";
 import type { Role } from "./roles";
 import type { Vector3 } from "three";
-import { initialMechanics, type MechanicalState } from "./vehicle/mechanics";
+import type { RepairState } from "./repair/repairMachine";
+import { initialMechanics, type BrokenPart, type MechanicalState } from "./vehicle/mechanics";
 import type { WeatherState } from "./weather/weather";
 
 /** Car readouts shown on the HUD. */
@@ -30,6 +31,10 @@ interface GameStore {
   mech: MechanicalState;
   /** Role currently standing outside the car on this client, or null when seated. */
   footRole: Role | null;
+  repair: RepairState;
+  setRepair: (repair: RepairState) => void;
+  /** Debug: `&fail=drive_belt` breaks that part when the stage starts (solo). */
+  failPart: BrokenPart | null;
   /** performance.now() when the player last got back in, for the camera blend. */
   seatedAtMs: number;
   setFootRole: (role: Role | null) => void;
@@ -50,7 +55,7 @@ interface GameStore {
   setWipersOn: (on: boolean) => void;
   setWeather: (weather: WeatherState) => void;
   setVisibility: (visibility: number) => void;
-  setFlags: (flags: { rainForced: boolean; debug: boolean; online: boolean; overheatForced: boolean }) => void;
+  setFlags: (flags: { rainForced: boolean; debug: boolean; online: boolean; overheatForced: boolean; failPart: BrokenPart | null }) => void;
   setTelemetry: (telemetry: Telemetry) => void;
   setRace: (race: RaceSnapshot) => void;
   toggleView: () => void;
@@ -89,6 +94,9 @@ export const useGameStore = create<GameStore>()((set) => ({
   placeholderCubeOn: false,
   mech: initialMechanics(),
   footRole: null,
+  repair: { kind: "idle" },
+  setRepair: (repair) => set({ repair }),
+  failPart: null,
   seatedAtMs: 0,
   setFootRole: (footRole) => set(footRole === null ? { footRole, seatedAtMs: performance.now() } : { footRole }),
   hoodOpen: false,

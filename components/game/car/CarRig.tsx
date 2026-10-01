@@ -9,6 +9,7 @@ import { useGameStore } from "@/lib/game/store";
 import { FRAME_PRIORITY } from "../scene/framePriority";
 import type { Role } from "@/lib/game/roles";
 import { CarExterior } from "./CarExterior";
+import { EngineBay } from "../repair/EngineBay";
 import { Cockpit } from "./Cockpit";
 
 interface CarRigProps {
@@ -39,6 +40,7 @@ export function CarRig({ session, role, solo }: CarRigProps) {
 
   return (
     <group ref={groupRef} name="car">
+      <EngineBay />
       {viewMode === "cockpit" && footRole === null ? (
         <Cockpit session={session} activeRole={activeRole} />
       ) : (

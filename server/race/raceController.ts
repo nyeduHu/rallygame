@@ -1,14 +1,16 @@
 // server/race/raceController.ts
 import { DRIVETRAIN, ON_FOOT, VEHICLE } from "../../lib/game/constants";
+import { applyStep, settle, type RepairState } from "../../lib/game/repair/repairMachine";
+import { REPAIR } from "../../lib/game/constants";
 import { canExit, canReenter, doorPosition } from "../../lib/game/onfoot/onFootController";
 import { stepCheckpoints, type CheckpointState } from "../../lib/game/race/checkpointLogic";
 import { generateStage } from "../../lib/game/stage/generateStage";
 import { RoadIndex } from "../../lib/game/stage/roadIndex";
 import type { StageData } from "../../lib/game/stage/types";
 import { NET } from "../../lib/net/netConstants";
-import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
+import type { CarImpact, CarInputs, FootPose, OnFootView, PoseReport, RepairStepPayload, Role, RaceCountdown, RaceEvent, RoomResults, TeamSnapshot, WorldSnapshot } from "../../lib/net/protocol";
 import type { Room } from "../rooms/room";
-import { initialMechanics, stepMechanics, applyCrash, type MechanicalState } from "../../lib/game/vehicle/mechanics";
+import { initialMechanics, stepMechanics, applyCrash, type BrokenPart, type MechanicalState } from "../../lib/game/vehicle/mechanics";
 import { MECHANICS } from "../../lib/game/constants";
 import { PENALTY } from "../../lib/game/race/penalties";
 import { PenaltyLedger } from "./penalties";
@@ -47,6 +49,10 @@ interface TeamRaceState {
   /** Seat occupancy and, while on foot, the last accepted foot pose per role. */
   occupancy: Record<Role, "seat" | "foot">;
   foot: Record<Role, { report: FootPose; atMs: number } | null>;
+  repair: RepairState;
+  /** Server time the current repair started, and total time spent repairing. */
+  repairStartedMs: number | null;
+  repairDurationMs: number;
 }
 
 /**
@@ -112,6 +118,9 @@ export class RaceController {
         pendingImpulse: 0,
         occupancy: { driver: "seat", codriver: "seat" },
         foot: { driver: null, codriver: null },
+        repair: { kind: "idle" },
+        repairStartedMs: null,
+        repairDurationMs: 0,
       });
     }
   }
@@ -176,6 +185,69 @@ export class RaceController {
     if (Math.hypot(pose.p[0] - car.p[0], pose.p[2] - car.p[2]) > ON_FOOT.MAX_DISTANCE_FROM_CAR_M) return false;
     team.foot[role] = { report: pose, atMs: nowMs };
     return true;
+  }
+
+  /**
+   * Applies a driver repair step if the driver is in the right place and the machine accepts it.
+   * @param teamId - Team.
+   * @param role - Player's role (only the driver repairs).
+   * @param request - Requested step.
+   * @returns Null when accepted, otherwise an error code.
+   */
+  repairStep(teamId: string, role: Role, request: RepairStepPayload): string | null {
+    const team = this.teams.get(teamId);
+    if (!team || role !== "driver" || team.status !== "racing") return "not_allowed";
+    const car = team.lastPose?.report;
+    const foot = team.foot.driver?.report;
+    if (request.step === "IGNITION") {
+      if (team.occupancy.driver !== "seat") return "not_in_seat";
+    } else {
+      if (team.occupancy.driver !== "foot" || !car || !foot) return "not_on_foot";
+      if (Math.hypot(foot.p[0] - car.p[0], foot.p[2] - car.p[2]) > REPAIR.MAX_DISTANCE_M) return "too_far";
+    }
+    const result = applyStep(team.repair, request, { engineStatus: team.mech.engineStatus, brokenPart: team.mech.brokenPart });
+    if (!result.ok) return result.error;
+    const nowMs = this.now();
+    team.repair = settle(result.state);
+    // Any accepted step is repair progress, which holds off the engine-failed DNF timer.
+    if (team.failedAtMs !== null) team.failedAtMs = nowMs;
+    if (team.repairStartedMs === null) team.repairStartedMs = nowMs;
+    if (result.penaltySeconds > 0) team.ledger.addPenaltySeconds(result.penaltySeconds);
+    if (result.effect === "hood_open") team.hoodOpen = true;
+    if (result.effect === "hood_closed") team.hoodOpen = false;
+    if (result.effect === "cooled") {
+      team.mech = { ...team.mech, temperature01: Math.min(team.mech.temperature01, REPAIR.COOLED_TEMPERATURE), engineStatus: "ok", failHoldSeconds: 0 };
+      this.finishRepair(team, nowMs);
+    }
+    if (result.effect === "engine_restarted") {
+      team.mech = {
+        ...team.mech,
+        engineStatus: "ok",
+        brokenPart: null,
+        failHoldSeconds: 0,
+        engineHealth01: Math.max(team.mech.engineHealth01, REPAIR.RESTORED_HEALTH),
+        temperature01: Math.min(team.mech.temperature01, REPAIR.COOLED_TEMPERATURE),
+      };
+      team.failedAtMs = null;
+      this.finishRepair(team, nowMs);
+    }
+    return null;
+  }
+
+  /**
+   * Forces an engine failure with a given broken part (scripted tests and debugging).
+   * @param teamId - Team.
+   * @param part - Part to break.
+   */
+  forceFailure(teamId: string, part: BrokenPart): void {
+    const team = this.teams.get(teamId);
+    if (team) team.mech = { ...team.mech, engineStatus: "failed", brokenPart: part };
+  }
+
+  /** Records the elapsed repair time and clears the start marker. */
+  private finishRepair(team: TeamRaceState, nowMs: number): void {
+    if (team.repairStartedMs !== null) team.repairDurationMs += nowMs - team.repairStartedMs;
+    team.repairStartedMs = null;
   }
 
   /** @returns A team's current mechanical state (for snapshots and tests), or null. */
@@ -372,6 +444,8 @@ export class RaceController {
       brokenPart: team.mech.brokenPart,
       penaltyMs: team.ledger.penaltyMs,
       occupancy: team.occupancy,
+      repair: "part" in team.repair ? { kind: team.repair.kind, part: team.repair.part } : { kind: team.repair.kind },
+      hoodOpen: team.hoodOpen,
     };
   }
 

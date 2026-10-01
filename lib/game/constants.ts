@@ -545,3 +545,25 @@ export const ON_FOOT = {
   HEAD_RADIUS: 0.2,
   SERVER_SPEED_SLACK: 1.5,
 } as const;
+
+/** Repair mini-game rules (spec 4.2, 19). */
+export const REPAIR = {
+  WRONG_GUESS_SECONDS: 3,
+  WRONG_PART_SECONDS: 5,
+  /** Engine health restored by a completed repair. */
+  RESTORED_HEALTH: 0.6,
+  CAP_TURNS: 1.5,
+  /** Pointer drag that counts as one turn of the radiator cap. */
+  CAP_PX_PER_TURN: 160,
+  HOOD_HOLD_S: 0.8,
+  REMOVE_DRAG_PX: 120,
+  INSTALL_DRAG_PX: 90,
+  WATER_HOLD_S: 3,
+  /** Cooling with water drops the temperature to this level. */
+  COOLED_TEMPERATURE: 0.4,
+  /** Player must be within this distance of the car to work on it. */
+  MAX_DISTANCE_M: 6,
+  /** Hood opens to this angle (radians). */
+  HOOD_OPEN_ANGLE: 1.05,
+  HOOD_DAMPING: 8,
+} as const;

@@ -5,8 +5,10 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import { SIMULATION, UNITS } from "@/lib/game/constants";
 import type { RemoteSession } from "@/lib/game/remoteSession";
+import { repairStateFromView } from "@/lib/game/repair/repairMachine";
 import { useGameStore } from "@/lib/game/store";
 import { serverNowMs, snapshotBuffer, useNetStore } from "@/lib/net/netStore";
+import { mechanicsFromSnapshot } from "@/lib/net/snapshotMechanics";
 import { SnapshotBuffer } from "@/lib/net/snapshotBuffer";
 import { FRAME_PRIORITY } from "./framePriority";
 
@@ -51,6 +53,13 @@ export function RemoteDriver({ session, teamId }: RemoteDriverProps) {
       finishTime: finished ? elapsed : null,
       progress: team?.progress01 ?? 0,
     });
+    if (team) {
+      const store = useGameStore.getState();
+      store.setMech(mechanicsFromSnapshot(team, store.mech));
+      const repair = repairStateFromView(team.repair);
+      if (repair) store.setRepair(repair);
+      if (team.hoodOpen !== undefined) store.setHoodOpen(team.hoodOpen);
+    }
     useGameStore.getState().setTelemetry({
       speedKmh: Math.abs(session.vehicle.forwardSpeed) * UNITS.MS_TO_KMH,
       rpm: session.vehicle.drivetrain.rpm,

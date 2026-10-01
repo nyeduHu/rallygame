@@ -6,34 +6,18 @@ import { useRef } from "react";
 import { DRIVETRAIN, MECHANICS, SIMULATION } from "@/lib/game/constants";
 import { gameEvents } from "@/lib/game/events";
 import type { GameSession } from "@/lib/game/session";
+import { mechRuntime } from "@/lib/game/mechRuntime";
+import { repairStateFromView } from "@/lib/game/repair/repairMachine";
 import { useGameStore } from "@/lib/game/store";
-import { applyCrash, initialMechanics, stepMechanics, type MechanicalState } from "@/lib/game/vehicle/mechanics";
+import { applyCrash, initialMechanics, stepMechanics } from "@/lib/game/vehicle/mechanics";
 import { useNetStore } from "@/lib/net/netStore";
-import type { TeamSnapshot } from "@/lib/net/protocol";
+import { mechanicsFromSnapshot } from "@/lib/net/snapshotMechanics";
 import { FRAME_PRIORITY } from "./framePriority";
 
 interface MechanicsDriverProps {
   session: GameSession;
   /** Online: follow the server's mechanics for this team instead of simulating locally. */
   ownTeamId?: string;
-}
-
-/**
- * Maps a server snapshot entry to a mechanical state.
- * @param team - Own team snapshot.
- * @param previous - Previous state (supplies fields the snapshot omits).
- * @returns Mechanical state mirroring the server.
- */
-function mechanicsFromSnapshot(team: TeamSnapshot, previous: MechanicalState): MechanicalState {
-  return {
-    ...previous,
-    fuel01: team.fuel ?? previous.fuel01,
-    engineHealth01: team.engineHealth ?? previous.engineHealth01,
-    temperature01: team.temperature ?? previous.temperature01,
-    damage01: team.damage ?? previous.damage01,
-    engineStatus: team.engineStatus ?? previous.engineStatus,
-    brokenPart: team.brokenPart ?? null,
-  };
 }
 
 /**
@@ -44,20 +28,28 @@ function mechanicsFromSnapshot(team: TeamSnapshot, previous: MechanicalState): M
  */
 export function MechanicsDriver({ session, ownTeamId }: MechanicsDriverProps) {
   const crashIndex = useRef(0);
+  const forcedFailure = useRef(false);
   const sincePublish = useRef(0);
   const lastStatus = useRef(initialMechanics().engineStatus);
-  /** Authoritative local copy; the store only receives it at HUD rate. */
-  const current = useRef<MechanicalState>(initialMechanics());
 
   useFrame((_, delta) => {
     const store = useGameStore.getState();
     sincePublish.current += delta;
-    let mech = current.current;
+    let mech = mechRuntime.current;
 
     if (store.online) {
       const team = ownTeamId ? useNetStore.getState().snapshot?.teams.find((entry) => entry.teamId === ownTeamId) : undefined;
-      if (team) mech = mechanicsFromSnapshot(team, mech);
+      if (team) {
+        mech = mechanicsFromSnapshot(team, mech);
+        const repair = repairStateFromView(team.repair);
+        if (repair) store.setRepair(repair);
+        if (team.hoodOpen !== undefined && team.hoodOpen !== store.hoodOpen) store.setHoodOpen(team.hoodOpen);
+      }
     } else if (store.race.phase === "running") {
+      if (store.failPart && !forcedFailure.current) {
+        forcedFailure.current = true;
+        mech = { ...mech, engineStatus: "failed", brokenPart: store.failPart };
+      }
       const dt = Math.min(delta, SIMULATION.MAX_STEPS_PER_FRAME * SIMULATION.FIXED_TIMESTEP);
       const { vehicle } = session;
       const forced = store.overheatForced;
@@ -87,7 +79,7 @@ export function MechanicsDriver({ session, ownTeamId }: MechanicsDriverProps) {
     }
 
     const statusChanged = mech.engineStatus !== store.mech.engineStatus;
-    current.current = mech;
+    mechRuntime.current = mech;
     if (!statusChanged && sincePublish.current < SIMULATION.HUD_PUBLISH_INTERVAL) return;
     sincePublish.current = 0;
     store.setMech(mech);

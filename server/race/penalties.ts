@@ -64,6 +64,14 @@ export class PenaltyLedger {
     return added;
   }
 
+  /**
+   * Adds a flat time penalty (for example a wrong repair guess).
+   * @param seconds - Penalty in seconds.
+   */
+  addPenaltySeconds(seconds: number): void {
+    this.add(seconds);
+  }
+
   /** Adds seconds to the ledger. */
   private add(seconds: number): number {
     const ms = seconds * MS_PER_SECOND;
