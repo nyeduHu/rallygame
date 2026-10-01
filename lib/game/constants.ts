@@ -689,3 +689,36 @@ export const ENGINE_SOUND = {
   MASTER_GAIN: 0.8,
   STORAGE_KEY: "rally-muted",
 } as const;
+
+/** Visual effects. */
+export const FX = {
+  MAX_DUST_PARTICLES: 600,
+  DUST_LIFETIME_S: 1.6,
+  DUST_RISE_SPEED: 0.8,
+  DUST_SIZE: 0.9,
+  DUST_COLOR: "#b89c74",
+  /** Dust is emitted above this speed on gravel. */
+  DUST_MIN_SPEED_MS: 4,
+  /** Particles spawned per second at 30 m/s. */
+  DUST_RATE_AT_30MS: 80,
+  MAX_SKID_SEGMENTS: 400,
+  /** Slip speed above which tyres leave marks. */
+  SKID_MIN_SLIP_MS: 2.5,
+  SKID_WIDTH: 0.22,
+  SKID_LENGTH: 0.6,
+  SKID_LIFT: 0.03,
+  SKID_COLOR: "#2b2a28",
+  SKID_SPACING_M: 0.5,
+  BRAKE_LIGHT_ON: "#ff2a1a",
+  BRAKE_LIGHT_OFF: "#4a0d0a",
+  BRAKE_LIGHT_SIZE: [0.22, 0.08, 0.04] as const,
+  BRAKE_LIGHT_POSITION: [0.55, 0.45, -2.08] as const,
+  /** Screen shake. */
+  SHAKE_FULL_IMPULSE: 20000,
+  SHAKE_MAX_METRES: 0.12,
+  SHAKE_MAX_RADIANS: 0.03,
+  SHAKE_DECAY_PER_S: 3.5,
+  SHAKE_FREQUENCY_HZ: 24,
+  SMOKE_WHITE: "#e6e8ec",
+  SMOKE_BLACK: "#1c1d21",
+} as const;

@@ -3,6 +3,9 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
+import { MECHANICS } from "@/lib/game/constants";
+import { gameEvents } from "@/lib/game/events";
+import { addShake } from "@/lib/game/shake";
 import { rallyClient } from "@/lib/net/client";
 import { NET } from "@/lib/net/netConstants";
 import { serverNowMs, useNetStore } from "@/lib/net/netStore";
@@ -51,6 +54,10 @@ export function NetDriver({ session }: NetDriverProps) {
       rpm: vehicle.drivetrain.rpm,
     });
     const impacts = session.consumeImpacts();
+    if (impacts.solidImpulse >= MECHANICS.CRASH_IMPULSE) {
+      gameEvents.emit("crash", { impulse: impacts.solidImpulse });
+      addShake(impacts.solidImpulse);
+    }
     if (impacts.solidImpulse > 0) socket.emit("car:impact", { kind: "solid", impulse: impacts.solidImpulse });
     impacts.coneHits.forEach((objectId) => socket.emit("car:impact", { kind: "cone", impulse: 0, objectId }));
     socket.emit("car:pose", {

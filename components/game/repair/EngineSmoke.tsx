@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import { BufferAttribute, BufferGeometry, Points, PointsMaterial } from "three";
 import { COCKPIT } from "@/lib/game/cockpitLayout";
+import { FX } from "@/lib/game/constants";
 import { createRng } from "@/lib/game/random";
 import { useGameStore } from "@/lib/game/store";
 
@@ -58,7 +59,8 @@ export function EngineSmoke() {
     const status = useGameStore.getState().mech.engineStatus;
     points.visible = status !== "ok";
     if (!points.visible) return;
-    material.opacity = status === "failed" ? 0.75 : 0.4;
+    material.opacity = status === "failed" ? 0.75 : 0.5;
+    material.color.set(status === "failed" ? FX.SMOKE_BLACK : FX.SMOKE_WHITE);
     const attribute = geometry.getAttribute("position");
     const array = attribute.array;
     const [ox, oy, oz] = COCKPIT.ENGINE_BAY.SMOKE_ORIGIN;

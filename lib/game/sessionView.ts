@@ -15,7 +15,9 @@ export interface VehicleView {
   readonly forwardSpeed: number;
   readonly steer: number;
   readonly handbrake: boolean;
-  readonly drivetrain: { readonly rpm: number; readonly reverse: boolean };
+  /** Largest sideways tyre slip speed (m/s) this step. */
+  readonly slipSpeed: number;
+  readonly drivetrain: { readonly rpm: number; readonly reverse: boolean; readonly brake: number };
   readonly wheels: ReadonlyArray<WheelView>;
   readonly body: { linvel(): { x: number; y: number; z: number } };
 }

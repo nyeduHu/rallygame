@@ -60,8 +60,9 @@ export class RemoteSession implements SessionView {
         return state.steer;
       },
       handbrake: false,
+      slipSpeed: 0,
       get drivetrain() {
-        return { rpm: state.rpm, reverse: state.reverse };
+        return { rpm: state.rpm, reverse: state.reverse, brake: 0 };
       },
       wheels: this.wheels,
       body: { linvel: () => ({ x: velocity.x, y: velocity.y, z: velocity.z }) },

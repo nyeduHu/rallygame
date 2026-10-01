@@ -18,6 +18,8 @@ import { Gates } from "./Gates";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
 import { AudioDriver } from "./AudioDriver";
+import { Dust } from "./Dust";
+import { SkidMarks } from "./SkidMarks";
 import { DistancePosts } from "./DistancePosts";
 import { FuelPump } from "../pit/FuelPump";
 import { PitArea } from "../pit/PitArea";
@@ -116,6 +118,8 @@ export function GameScene({
       {online && <PlayerBodies ownTeamId={online.ownTeamId} ownRole={role} teamIds={[online.ownTeamId, ...online.remoteTeamIds]} />}
       <WeatherDriver session={session} ownTeamId={online?.ownTeamId} />
       <Rain />
+      <Dust session={session} />
+      {session instanceof GameSession && <SkidMarks session={session} />}
       <AudioDriver session={session} />
       <ReadySignal onReady={onReady} />
     </InteractionDriver>

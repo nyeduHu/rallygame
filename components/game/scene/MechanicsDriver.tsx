@@ -8,6 +8,7 @@ import { gameEvents } from "@/lib/game/events";
 import type { GameSession } from "@/lib/game/session";
 import { initialRefuel, stepRefuel } from "@/lib/game/refuel/refuelMachine";
 import { isInsidePitBox } from "@/lib/game/stage/pitStop";
+import { addShake } from "@/lib/game/shake";
 import { mechRuntime } from "@/lib/game/mechRuntime";
 import { repairStateFromView } from "@/lib/game/repair/repairMachine";
 import { useGameStore } from "@/lib/game/store";
@@ -95,6 +96,7 @@ export function MechanicsDriver({ session, ownTeamId }: MechanicsDriverProps) {
         mech = applyCrash(mech, session.stage.seed, crashIndex.current);
         crashIndex.current += 1;
         gameEvents.emit("crash", { impulse: impacts.solidImpulse });
+        addShake(impacts.solidImpulse);
       }
     }
 
