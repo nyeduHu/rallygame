@@ -15,9 +15,10 @@ const CLOCK_RESYNC_MS = 10_000;
 
 /**
  * React hook exposing the room lifecycle, race stream and clock sync for the lobby and race UI.
+ * @param resumeCode - Room code from the URL; when it matches the stored session the player is resumed after a refresh.
  * @returns Room state, the local player, connection status and lobby actions.
  */
-export function useRoom(): {
+export function useRoom(resumeCode?: string): {
   room: RoomView | null;
   me: Me | null;
   connected: boolean;
@@ -55,6 +56,17 @@ export function useRoom(): {
     const handleConnect = (): void => {
       setConnected(true);
       void syncClock();
+      const saved = rallyClient.restoreSession();
+      if (saved && resumeCode && saved.roomCode === resumeCode) {
+        void rallyClient
+          .request<{ playerId: string; room: RoomView }>("room:resume", saved)
+          .then((response) => {
+            if (!response.ok) return;
+            setPlayerId(response.playerId);
+            setRoom(response.room);
+          })
+          .catch(() => undefined);
+      }
     };
     const handleDisconnect = (): void => setConnected(false);
     const handleCountdown = (payload: RaceCountdown): void => {
@@ -88,7 +100,7 @@ export function useRoom(): {
       socket.off("race:event", handleEvent);
       socket.off("race:results", handleResults);
     };
-  }, [socket]);
+  }, [socket, resumeCode]);
 
   const me = useMemo<Me | null>(() => {
     const player = room?.players.find((entry) => entry.id === playerId);

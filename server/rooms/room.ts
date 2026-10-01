@@ -1,5 +1,5 @@
 // server/rooms/room.ts
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { randomSeed } from "../../lib/game/random";
 import type { PlayerView, Role, RoomPhase, RoomView, TeamView } from "../../lib/net/protocol";
 import { NET } from "../../lib/net/netConstants";
@@ -13,7 +13,8 @@ export interface RoomPlayer {
   ready: boolean;
   role: Role | null;
   teamId: string | null;
-  resumeToken: string;
+  /** SHA-256 of the resume token; the raw token is only ever sent to its owner. */
+  resumeTokenHash: string;
   disconnectedAtMs: number | null;
 }
 
@@ -28,6 +29,13 @@ export interface RoomOptions {
   maxTeams?: number;
   seed?: number;
   stageIndex?: number;
+}
+
+const RESUME_TOKEN_BYTES = 16;
+
+/** @returns SHA-256 hex digest of a resume token. */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function sanitizeName(name: string): string {
@@ -67,7 +75,7 @@ export class Room {
       ready: false,
       role: null,
       teamId: null,
-      resumeToken: randomUUID().replace(/-/g, ""),
+      resumeTokenHash: "",
       disconnectedAtMs: null,
     };
 
@@ -214,10 +222,23 @@ export class Room {
     return { ok: true };
   }
 
+  /**
+   * Issues a fresh 128-bit resume token for a player and stores only its hash.
+   * @param playerId - Player to issue for.
+   * @returns The raw token (empty string for an unknown player).
+   */
+  issueResumeToken(playerId: string): string {
+    const player = this.players.get(playerId);
+    if (!player) return "";
+    const token = randomBytes(RESUME_TOKEN_BYTES).toString("hex");
+    player.resumeTokenHash = hashToken(token);
+    return token;
+  }
+
   /** Resumes a disconnected player if the resume token matches. */
   resumePlayer(playerId: string, resumeToken: string): boolean {
     const player = this.players.get(playerId);
-    if (!player || player.resumeToken !== resumeToken) {
+    if (!player || player.resumeTokenHash === "" || player.resumeTokenHash !== hashToken(resumeToken)) {
       return false;
     }
 

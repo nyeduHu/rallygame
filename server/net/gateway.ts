@@ -5,6 +5,7 @@ import { type ClientEventName, clientEventSchemas, poseReportSchema } from "../.
 import type { Room } from "../rooms/room";
 import { RoomManager } from "../rooms/roomManager";
 import { RaceController } from "../race/raceController";
+import { TokenBucket } from "./rateLimit";
 import { withValidatedSocket } from "./validate";
 
 /** Finds the room that owns a socket's player ID. */
@@ -19,7 +20,11 @@ function emitRoomState(io: Server, room: Room): void {
 }
 
 /** Creates a Socket.IO gateway for room lifecycle and state synchronization. */
-export function bindGateway(io: Server, roomManager: RoomManager): void {
+export function bindGateway(
+  io: Server,
+  roomManager: RoomManager,
+  rateLimits: Readonly<Record<string, number>> = NET.RATE_LIMITS,
+): void {
   const races = new Map<string, { controller: RaceController; timer: NodeJS.Timeout }>();
 
   /** Starts the authoritative race loop for a room that just left the lobby. */
@@ -48,9 +53,20 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
   }
 
   io.on("connection", (socket: Socket) => {
+    const buckets = new Map<string, TokenBucket>();
     socket.onAny(async (event: string, payload: unknown, ack?: (value: unknown) => void) => {
       if (!clientEventSchemas[event as keyof typeof clientEventSchemas]) {
         return;
+      }
+
+      const limit = rateLimits[event];
+      if (limit !== undefined) {
+        const bucket = buckets.get(event) ?? new TokenBucket(limit);
+        buckets.set(event, bucket);
+        if (!bucket.take()) {
+          if (typeof ack === "function") ack({ ok: false, error: "rate_limited" });
+          return;
+        }
       }
 
       const result = await withValidatedSocket(socket, event, payload, async (data: Record<string, unknown>) => {
@@ -69,7 +85,7 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
             ok: true,
             roomCode: room.code,
             playerId: host.id,
-            resumeToken: host.resumeToken,
+            resumeToken: room.issueResumeToken(host.id),
             room: room.toView(),
           };
         }
@@ -88,9 +104,21 @@ export function bindGateway(io: Server, roomManager: RoomManager): void {
           return {
             ok: true,
             playerId: player.id,
-            resumeToken: player.resumeToken,
+            resumeToken: room.issueResumeToken(player.id),
             room: room.toView(),
           };
+        }
+
+        if (event === "room:resume") {
+          const room = roomManager.getRoom(String(data.roomCode ?? ""));
+          const playerId = String(data.playerId ?? "");
+          if (!room || !room.resumePlayer(playerId, String(data.resumeToken ?? ""))) {
+            return { ok: false, error: "resume_failed" };
+          }
+          socket.data.playerId = playerId;
+          socket.join(room.code);
+          emitRoomState(io, room);
+          return { ok: true, playerId, room: room.toView() };
         }
 
         if (event === "team:create") {

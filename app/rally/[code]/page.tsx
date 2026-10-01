@@ -3,6 +3,8 @@
 
 import { use, useState } from "react";
 import { RallyGameLoader } from "@/components/game/RallyGameLoader";
+import { ReadyButton } from "@/components/lobby/ReadyButton";
+import { ShareCode } from "@/components/lobby/ShareCode";
 import { TeamList } from "@/components/lobby/TeamList";
 import { RoomResults } from "@/components/results/RoomResults";
 import { useNetStore } from "@/lib/net/netStore";
@@ -19,7 +21,7 @@ const RACING_PHASES = new Set(["countdown", "racing", "pit_stop", "finished"]);
  */
 export default function RallyRoutePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
-  const { room, me, connected, createRoom, joinRoom, setReady, startRace, createTeam, joinTeam } = useRoom();
+  const { room, me, connected, createRoom, joinRoom, setReady, startRace, createTeam, joinTeam } = useRoom(code);
   const results = useNetStore((state) => state.results);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,12 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
   const isHost = room !== null && me !== null && room.hostId === me.id;
   const myTeam = room?.teams.find((team) => team.id === me?.teamId);
   const seated = Boolean(myTeam?.driver && myTeam?.codriver);
+  const myReady = room?.players.find((player) => player.id === me?.id)?.ready ?? false;
+  const seatedPlayers = room?.players.filter((player) => player.teamId !== null) ?? [];
+  const canStart =
+    seatedPlayers.length > 0 &&
+    seatedPlayers.every((player) => player.ready) &&
+    (room?.teams.some((team) => team.driver && team.codriver) ?? false);
 
   if (room && RACING_PHASES.has(room.phase) && me?.role && seated) {
     const remoteTeamIds = room.teams.filter((team) => team.id !== me.teamId && team.driver && team.codriver).map((team) => team.id);
@@ -75,9 +83,8 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
 
         {room && (
           <>
-            <p aria-live="polite" className="text-lg">
-              Room code: <span className="font-mono text-cyan-300">{room.code}</span> · {room.players.length} player(s)
-            </p>
+            <ShareCode code={room.code} />
+            <p className="text-sm text-slate-400">{room.players.length} player(s) connected</p>
 
             {room.phase === "results" && results ? (
               <RoomResults results={results} />
@@ -87,16 +94,19 @@ export default function RallyRoutePage({ params }: { params: Promise<{ code: str
                   <button type="button" className="rounded bg-emerald-500 px-4 py-2 font-medium text-slate-950" onClick={() => void createTeam()}>
                     Add team
                   </button>
-                  <button type="button" className="rounded bg-cyan-500 px-4 py-2 font-medium text-slate-950" onClick={() => void setReady(true)}>
-                    Ready
-                  </button>
+                  <ReadyButton ready={myReady} disabled={me?.teamId == null} onToggle={(next) => void setReady(next)} />
                   {isHost && (
-                    <button type="button" className="rounded bg-violet-500 px-4 py-2 font-medium text-white" onClick={() => void startRace()}>
+                    <button
+                      type="button"
+                      disabled={!canStart}
+                      className="rounded bg-violet-500 px-4 py-2 font-medium text-white disabled:opacity-50"
+                      onClick={() => void startRace()}
+                    >
                       START RALLY
                     </button>
                   )}
                 </div>
-                <TeamList room={room} onJoinTeam={(teamId, role) => void joinTeam(teamId, role)} />
+                <TeamList room={room} myPlayerId={me?.id ?? null} onJoinTeam={(teamId, role) => void joinTeam(teamId, role)} />
               </>
             )}
           </>

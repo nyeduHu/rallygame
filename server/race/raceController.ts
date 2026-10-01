@@ -147,6 +147,7 @@ export class RaceController {
     const nowMs = this.now();
     if (this.done || nowMs < this.goAtMs) return;
     if (this.room.phase === "countdown") this.room.phase = "racing";
+    this.dnfAbsentDrivers(nowMs);
     this.sink.snapshot({
       serverNowMs: nowMs,
       raceElapsedMs: nowMs - this.goAtMs,
@@ -154,6 +155,19 @@ export class RaceController {
       teams: [...this.teams.values()].map((team) => this.teamSnapshot(team)),
     });
     if ([...this.teams.values()].every((team) => team.status !== "racing")) this.complete();
+  }
+
+  /** Marks teams DNF when their driver has been gone longer than the reconnect grace period. */
+  private dnfAbsentDrivers(nowMs: number): void {
+    for (const team of this.teams.values()) {
+      if (team.status !== "racing") continue;
+      const driverId = this.room.teams.get(team.teamId)?.driverId;
+      const driver = driverId ? this.room.players.get(driverId) : undefined;
+      const goneSince = driver && !driver.connected ? driver.disconnectedAtMs : null;
+      if (goneSince !== null && goneSince !== undefined && nowMs - goneSince > NET.RECONNECT_GRACE_S * 1000) {
+        this.markDnf(team.teamId, "driver_left");
+      }
+    }
   }
 
   /** @returns Snapshot entry for a team using its latest validated pose. */
