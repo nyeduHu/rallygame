@@ -13,8 +13,8 @@ export interface InteractableSpec {
   roles: readonly Role[];
   /** Enabled predicate evaluated each hit-test (cheap, no allocation). */
   isEnabled: () => boolean;
-  /** Label shown near the crosshair when looked at. */
-  label: string;
+  /** Label shown near the crosshair when looked at (a function when it depends on game state). */
+  label: string | (() => string);
   /** Meshes or groups to raycast against. */
   getObjects: () => readonly Object3D[];
   onPress?: () => void;
@@ -28,6 +28,16 @@ export interface InteractableSpec {
 export interface InteractionHit {
   id: string;
   distance: number;
+}
+
+/**
+ * The prompt shown at the crosshair: the key to press, then what it does.
+ * @param spec - Interactable under the crosshair.
+ * @returns Text such as "E · Open the hood" or "Hold E · Open the hood".
+ */
+export function promptFor(spec: InteractableSpec): string {
+  const label = typeof spec.label === "function" ? spec.label() : spec.label;
+  return `${spec.kind === "hold" ? "Hold E" : "E"} · ${label}`;
 }
 
 /**

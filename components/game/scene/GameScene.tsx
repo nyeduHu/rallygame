@@ -16,6 +16,7 @@ import { CarRig } from "../car/CarRig";
 import { Cones } from "./Cones";
 import { Gates } from "./Gates";
 import { buildWallMesh } from "@/lib/game/stage/walls";
+import { HeldItems } from "../onfoot/HeldItems";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
 import { AudioDriver } from "./AudioDriver";
@@ -108,6 +109,7 @@ export function GameScene({
       {online && <GhostCars teamIds={online.remoteTeamIds} />}
       {session.stage.pit && <PitArea pit={session.stage.pit} />}
       {session.stage.pit && <FuelPump pit={session.stage.pit} session={session} />}
+      <HeldItems role={role} solo={solo} />
       <OnFootRig
         session={session}
         road={road}

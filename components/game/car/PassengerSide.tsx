@@ -6,7 +6,6 @@ import { useFrame } from "@react-three/fiber";
 import { Group, Vector3 } from "three";
 import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { INTERACTION } from "@/lib/game/constants";
-import type { InteractableSpec } from "@/lib/game/interaction/interactionSystem";
 import { PALETTE } from "@/lib/game/palette";
 import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
@@ -14,7 +13,6 @@ import { useGameStore } from "@/lib/game/store";
 import { beamTransform } from "./Beam";
 import { Tablet } from "./Tablet";
 import { WiperSwitch } from "./WiperSwitch";
-import { Interactable } from "../interaction/Interactable";
 
 type Vec3 = readonly [number, number, number];
 
@@ -94,33 +92,6 @@ function RestingHand({ elbow, rest, active = false }: RestingHandProps) {
   );
 }
 
-/** Renders the acceptance-test object that proves mouse and keyboard presses work. */
-function InteractionDemoCube() {
-  const isOn = useGameStore((state) => state.placeholderCubeOn);
-  const spec = useMemo<InteractableSpec>(() => ({
-    id: "interaction-demo-cube",
-    kind: "toggle",
-    roles: ["driver", "codriver"],
-    isEnabled: () => true,
-    label: "Test switch",
-    getObjects: () => [],
-    onPress: () => useGameStore.getState().togglePlaceholderCube(),
-  }), []);
-
-  return (
-    <Interactable spec={spec}>
-      <mesh position={[...INTERACTION.PLACEHOLDER_CUBE_POSITION]} castShadow>
-        <boxGeometry args={[
-          INTERACTION.PLACEHOLDER_CUBE_SIZE,
-          INTERACTION.PLACEHOLDER_CUBE_SIZE,
-          INTERACTION.PLACEHOLDER_CUBE_SIZE,
-        ]} />
-        <meshStandardMaterial color={isOn ? PALETTE.carBody : PALETTE.leverKnob} flatShading />
-      </mesh>
-    </Interactable>
-  );
-}
-
 /**
  * Passenger-side dash details, tablet mount, and static hands resting on the lap.
  * Hand movement is intentionally left for the later interaction-system step.
@@ -149,7 +120,6 @@ export function PassengerSide({ session, activeRole }: PassengerSideProps) {
         <Tablet session={session} activeRole={activeRole} />
       </group>
 
-      <InteractionDemoCube />
       <RestingHand elbow={COCKPIT.PASSENGER_HANDS.ELBOW.LEFT} rest={COCKPIT.PASSENGER_HANDS.REST.LEFT} />
       <RestingHand elbow={COCKPIT.PASSENGER_HANDS.ELBOW.RIGHT} rest={COCKPIT.PASSENGER_HANDS.REST.RIGHT} active />
     </group>

@@ -20,7 +20,7 @@ export function Crosshair() {
         />
         {hoveredLabel && (
           <span className="rounded-md bg-hud-surface/90 px-2.5 py-1 text-xs font-semibold shadow-lg">
-            {hoveredLabel} · E / click
+            {hoveredLabel}
           </span>
         )}
       </div>

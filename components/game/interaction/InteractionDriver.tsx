@@ -7,7 +7,7 @@ import type { MouseLook } from "@/lib/game/input/mouseLook";
 import type { Role } from "@/lib/game/roles";
 import { useGameStore } from "@/lib/game/store";
 import { INTERACTION } from "@/lib/game/constants";
-import { InteractionSystem } from "@/lib/game/interaction/interactionSystem";
+import { InteractionSystem, promptFor } from "@/lib/game/interaction/interactionSystem";
 
 const InteractionContext = createContext<InteractionSystem | null>(null);
 
@@ -68,7 +68,7 @@ export function InteractionDriver({ system, mouseLook, role, solo, children }: I
     if (publishElapsed.current < 1 / INTERACTION.HOVER_PUBLISH_HZ) return;
     publishElapsed.current %= 1 / INTERACTION.HOVER_PUBLISH_HZ;
 
-    const hoveredLabel = system.hovered?.label ?? null;
+    const hoveredLabel = system.hovered ? promptFor(system.hovered) : null;
     if (hoveredLabel !== publishedLabel.current) {
       publishedLabel.current = hoveredLabel;
       useGameStore.getState().setHoveredLabel(hoveredLabel);

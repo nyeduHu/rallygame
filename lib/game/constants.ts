@@ -198,78 +198,23 @@ export const PACE_NOTES = {
 export const TABLET = {
   CANVAS_SIZE: { width: 1024, height: 640 },
   REDRAW_HZ: 10,
-  MAP_MARGIN: 38,
-  ROAD_LINE_WIDTH: 7,
-  ARROW_SPACING_METRES: 150,
-  DISTANCE_TICK_METRES: 500,
-  NEXT_WINDOW_METRES: 600,
-  NEXT_REAR_WINDOW_METRES: 80,
-  NEXT_CAR_VERTICAL_RATIO: 0.72,
   DEGREES_PER_RADIAN: 180 / Math.PI,
   HEADER_HEIGHT: 36,
   PROJECTION_SEARCH_RADIUS: 250,
-  /** Chevron every this many samples along revealed road. */
-  ARROW_SAMPLE_INTERVAL: 75,
-  FINISH_DISTANCE_STEP_M: 10,
-  COMPASS_RADIUS: 30,
-  COMPASS_MARGIN: 64,
   SCREEN_SIZE: [0.54, 0.32, 0.025] as const,
   BODY_SIZE: [0.59, 0.37, 0.055] as const,
   BODY_POSITION: [0, 0, 0] as const,
   BODY_CORNER_RADIUS: 0.025,
   BODY_ROUGHNESS: 0.6,
-  BUTTON_SIZE: [0.045, 0.045, 0.02] as const,
   SCREEN_OFFSET: [0, 0, -0.035] as const,
   SCREEN_FACING_YAW: Math.PI,
   LEGEND_HEIGHT: 42,
-  NOTE_STRIP_HEIGHT: 116,
   HEADER_TITLE_X: 56,
-  /** Title starts right of the physical mode button in the top-left corner. */
-  HEADER_TITLE_LEFT: 120,
   HEADER_CENTER_Y: 20,
-  HEADER_TITLE_FONT_SIZE: 26,
-  HEADER_MODE_FONT_SIZE: 21,
-  ROAD_CENTER_LINE_WIDTH: 1.5,
   MARKER_STROKE_WIDTH: 2,
   START_MARKER_RADIUS: 9,
-  FINISH_CHECKER_SIZE: 6,
-  FINISH_CHECKER_COLUMNS: 2,
-  FINISH_CHECKER_CENTER_OFFSET: 1,
-  CHECKPOINT_HALF_LENGTH: 8,
-  CHECKPOINT_LINE_WIDTH: 2,
-  DIRECTION_ARROW_LENGTH: 8,
-  DIRECTION_ARROW_HALF_WIDTH: 6,
-  DIRECTION_ARROW_BASE_Y: 2,
-  DIRECTION_ARROW_STROKE_WIDTH: 3,
-  DISTANCE_LABEL_FONT_SIZE: 17,
-  DISTANCE_LABEL_OFFSET_X: 12,
-  DISTANCE_LABEL_OFFSET_Y: 12,
-  CORNER_MARKER_RADIUS: 12,
-  CORNER_MARKER_FONT_SIZE: 16,
-  HAIRPIN_RADIUS: 9,
-  HAIRPIN_STROKE_WIDTH: 3,
-  HAIRPIN_ARROW_INSET: 1,
-  HAIRPIN_ARROW_OFFSET: 1,
-  HAIRPIN_ARROW_BASE_Y: 2,
-  CAR_MARKER_LENGTH: 13,
-  CAR_MARKER_HALF_WIDTH: 9,
-  CAR_MARKER_REAR_INSET: 6,
   CAR_MARKER_TAIL_Y_OFFSET: 3,
-  NOTE_STRIP_PADDING_X: 24,
-  NOTE_LABEL_FONT_SIZE: 19,
-  NOTE_PRIMARY_FONT_SIZE: 43,
-  NOTE_DISTANCE_FONT_SIZE: 25,
-  NOTE_FOLLOWUP_FONT_SIZE: 20,
-  NOTE_PRIMARY_BASELINE: 75,
-  NOTE_DISTANCE_BASELINE: 72,
-  NOTE_FOLLOWUP_BASELINE: 103,
-  NOTE_LABEL_BASELINE: 27,
-  NOTE_DISTANCE_RESERVED_WIDTH: 265,
   CORNER_MARKER_BASELINE_OFFSET: 1,
-  LEGEND_FONT_SIZE: 18,
-  LEGEND_HAIRPIN_X_OFFSET: 147,
-  LEGEND_HAIRPIN_TEXT_OFFSET: 128,
-  BUTTON_OFFSET: [0.255, 0.14, -0.047] as const,
 } as const;
 
 /** Reach, update, and presentation limits for physical cockpit interactions. */
@@ -741,38 +686,6 @@ export const NETWORK = {
   WRONG_WAY_GRACE_M: 60,
   /** Time penalty for confirming a wrong turn. */
   WRONG_WAY_PENALTY_S: 8,
-  /** Number of forks to try to place per stage. */
-  FORK_COUNT: 3,
-  /** Alternative routes among the forks (the rest are dead ends). */
-  ALTERNATIVE_COUNT: 2,
-  /** Alternatives span this much of the reference route (fork to join). */
-  ALT_SPAN_MIN: 260,
-  ALT_SPAN_MAX: 520,
-  /** Angle at which a side road leaves the main road. */
-  FORK_ANGLE_MIN: 30 * DEG_TO_RAD,
-  FORK_ANGLE_MAX: 55 * DEG_TO_RAD,
-  /** Bezier handle length as a fraction of the fork-to-join chord. */
-  HANDLE_MIN: 0.45,
-  HANDLE_MAX: 0.8,
-  DEAD_END_MIN: 220,
-  DEAD_END_MAX: 480,
-  /** A fork or join needs this much straight road on either side. */
-  FORK_CORNER_CLEARANCE_M: 22,
-  /** Forks keep this far from gates (their zones may not contain a gate). */
-  FORK_GATE_CLEARANCE_M: 60,
-  /** Padding added around a fork zone (pit and later forks keep out of it). */
-  FORK_ZONE_PAD_M: 30,
-  FORK_EDGE_CLEARANCE_M: 160,
-  /** Minimum spacing between fork zones. */
-  FORK_SPACING_M: 120,
-  /** Branch samples this close (along the branch) to either end may touch the main road. */
-  JUNCTION_ZONE_M: 90,
-  /** A branch must keep at least this radius so it is drivable. */
-  BRANCH_MIN_RADIUS: 18,
-  /** Curvature (1/m) above which a stretch of an alternative counts as a corner. */
-  CORNER_CURVATURE: 1 / 260,
-  /** Corner gaps shorter than this many samples merge into one corner. */
-  CORNER_MERGE_SAMPLES: 5,
 } as const;
 
 /** Maze network: a walled grid of rooms with one route through it (the co-driver finds it on the map). */
@@ -841,4 +754,24 @@ export const MAZE_MAP = {
   FONT_PX: 20,
   TITLE_FONT_PX: 24,
   FOOTER_FONT_PX: 17,
+} as const;
+
+/** Wrench model and how it is held in first person. */
+export const WRENCH = {
+  HANDLE_SIZE: [0.035, 0.012, 0.26] as const,
+  HEAD_RADIUS: 0.032,
+  HEAD_TUBE: 0.011,
+  HEAD_SEGMENTS: 6,
+  COLOR: "#c9ced6",
+  /** Hand and wrench offsets in camera space (x right, y up, z forward is negative). */
+  HAND_OFFSET: [0.24, -0.3, -0.55] as const,
+  HAND_TILT: [-0.35, 0.15, 0.05] as const,
+  FOREARM_SIZE: [0.07, 0.07, 0.34] as const,
+  FOREARM_OFFSET: [0, -0.02, 0.28] as const,
+  GLOVE_RADIUS: 0.045,
+  /** Wrench pose inside the held hand. */
+  IN_HAND_OFFSET: [0, 0.02, -0.12] as const,
+  /** Wrench pose on another player's body. */
+  BODY_OFFSET: [0.32, 0.95, 0.28] as const,
+  BODY_TILT: [-0.6, 0, 0] as const,
 } as const;

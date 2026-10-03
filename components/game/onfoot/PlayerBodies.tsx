@@ -4,11 +4,13 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
-import { ON_FOOT } from "@/lib/game/constants";
+import { ON_FOOT, WRENCH } from "@/lib/game/constants";
 import { TEAM_COLORS } from "@/lib/game/palette";
 import { damp } from "@/lib/game/math";
 import { useNetStore } from "@/lib/net/netStore";
 import type { Role } from "@/lib/game/roles";
+import { useGameStore } from "@/lib/game/store";
+import { Wrench } from "../repair/Wrench";
 
 const FOLLOW_RATE = 14;
 const KEY_SEPARATOR = "|";
@@ -18,6 +20,8 @@ interface BodyProps {
   teamId: string;
   role: Role;
   color: string;
+  /** Show the wrench in this person's hand. */
+  holdingWrench: boolean;
 }
 
 /**
@@ -25,7 +29,7 @@ interface BodyProps {
  * @param props - Identity and colour.
  * @returns Character group.
  */
-function Body({ teamId, role, color }: BodyProps) {
+function Body({ teamId, role, color, holdingWrench }: BodyProps) {
   const ref = useRef<Group>(null);
   const placed = useRef(false);
   useFrame((_, delta) => {
@@ -51,6 +55,9 @@ function Body({ teamId, role, color }: BodyProps) {
         <sphereGeometry args={[ON_FOOT.HEAD_RADIUS, 8, 6]} />
         <meshStandardMaterial color={SKIN} flatShading />
       </mesh>
+      <group position={[...WRENCH.BODY_OFFSET]} rotation={[...WRENCH.BODY_TILT]} visible={holdingWrench}>
+        <Wrench />
+      </group>
     </group>
   );
 }
@@ -67,6 +74,7 @@ interface PlayerBodiesProps {
  * @returns Bodies for teammates and other teams.
  */
 export function PlayerBodies({ ownTeamId, ownRole, teamIds }: PlayerBodiesProps) {
+  const holding = useGameStore((state) => state.repair.kind === "tool_in_hand" || state.repair.kind === "part_removed");
   const keys = useNetStore((state) =>
     (state.snapshot?.onFoot ?? []).map((view) => `${view.teamId}${KEY_SEPARATOR}${view.role}`).join(","),
   );
@@ -80,7 +88,7 @@ export function PlayerBodies({ ownTeamId, ownRole, teamIds }: PlayerBodiesProps)
           if (role !== "driver" && role !== "codriver") return null;
           if (teamId === ownTeamId && role === ownRole) return null;
           const color = TEAM_COLORS[Math.max(0, teamIds.indexOf(teamId)) % TEAM_COLORS.length];
-          return <Body key={key} teamId={teamId} role={role} color={color} />;
+          return <Body key={key} teamId={teamId} role={role} color={color} holdingWrench={holding && teamId === ownTeamId} />;
         })}
     </>
   );

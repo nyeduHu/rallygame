@@ -42,7 +42,7 @@ function hoseSpec(): InteractableSpec {
     kind: "press",
     roles: ["codriver"],
     isEnabled: () => working() && useGameStore.getState().refuel.kind !== "connected" && useGameStore.getState().refuel.kind !== "fueling",
-    label: "Fuel hose",
+    label: () => (useGameStore.getState().refuel.kind === "idle" ? "Grab the fuel hose" : "Put the hose back"),
     getObjects: () => [],
     onPress: () => submitRefuelStep(useGameStore.getState().refuel.kind === "idle" ? "GRAB_HOSE" : "RETURN_HOSE"),
   };
@@ -58,7 +58,7 @@ function leverSpec(): InteractableSpec {
     kind: "toggle",
     roles: ["codriver"],
     isEnabled: () => working() && (useGameStore.getState().refuel.kind === "connected" || useGameStore.getState().refuel.kind === "fueling"),
-    label: "Pump lever",
+    label: () => (useGameStore.getState().refuel.kind === "fueling" ? "Stop the pump" : "Start the pump"),
     getObjects: () => [],
     onPress: () => submitRefuelStep(useGameStore.getState().refuel.kind === "fueling" ? "STOP" : "START"),
   };
@@ -74,7 +74,13 @@ function flapSpec(): InteractableSpec {
     kind: "press",
     roles: ["codriver"],
     isEnabled: () => working(),
-    label: "Fuel flap",
+    label: () => {
+      const { refuel } = useGameStore.getState();
+      if (!refuel.flapOpen) return "Open the fuel flap";
+      if (refuel.kind === "hose_held") return "Connect the hose";
+      if (refuel.kind === "connected") return "Disconnect the hose";
+      return "Close the fuel flap";
+    },
     getObjects: () => [],
     onPress: () => {
       const { refuel } = useGameStore.getState();

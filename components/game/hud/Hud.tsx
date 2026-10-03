@@ -2,6 +2,7 @@
 "use client";
 
 import { useGameStore } from "@/lib/game/store";
+import { FixGuide } from "./FixGuide";
 import { MechanicsBars } from "./MechanicsBars";
 import { Speedometer } from "./Speedometer";
 import { StageTimer } from "./StageTimer";
@@ -64,6 +65,7 @@ export function Hud() {
         <StageTimer />
         <PitBanner />
       </div>
+      <FixGuide />
       <div className="flex flex-col items-center gap-3">
         <Countdown />
       </div>

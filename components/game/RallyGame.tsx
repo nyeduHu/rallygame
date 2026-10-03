@@ -81,7 +81,7 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
   useEffect(() => {
     setRole(role);
     setSoloActiveRole(role);
-    if (role === "codriver") mouseLook.pitch = -MAZE_MAP.START_PITCH_DOWN_RAD;
+    if (role === "codriver") mouseLook.lookDown(MAZE_MAP.START_PITCH_DOWN_RAD);
     return keyboard.onRoleSwapChange((held) => setSoloActiveRole(held ? (role === "driver" ? "codriver" : "driver") : role));
   }, [keyboard, mouseLook, role, setRole, setSoloActiveRole]);
 

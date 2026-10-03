@@ -11,10 +11,20 @@ export class MouseLook {
   yaw = 0;
   pitch = 0;
   private idleTime = 0;
+
+  /**
+   * Points the view down by an angle (used to start the co-driver looking at the tablet).
+   * @param radians - Downward angle.
+   */
+  lookDown(radians: number): void {
+    this.pitch = -radians;
+  }
+
   private element: HTMLElement | null = null;
   private lockListener: ((locked: boolean) => void) | null = null;
   private pitchDownLimit = CAMERA.MAX_PITCH_DOWN;
   private suspended = false;
+  private recentring = true;
   private freeLook = false;
   private movementX = 0;
   private movementY = 0;
@@ -79,6 +89,15 @@ export class MouseLook {
     this.idleTime = 0;
   }
 
+  /**
+   * Chooses whether the seated view eases back to centre when the mouse is idle (the co-driver
+   * keeps looking wherever they left it, e.g. down at the tablet).
+   * @param enabled - True to recentre.
+   */
+  setRecentring(enabled: boolean): void {
+    this.recentring = enabled;
+  }
+
   /** Pauses camera motion while an interaction owns pointer movement. */
   setSuspended(suspended: boolean): void {
     this.suspended = suspended;
@@ -139,7 +158,7 @@ export class MouseLook {
    * @param dt - Frame delta.
    */
   update(dt: number): void {
-    if (this.suspended || this.freeLook) return;
+    if (this.suspended || this.freeLook || !this.recentring) return;
     this.idleTime += dt;
     if (this.idleTime < CAMERA.RECENTER_DELAY) return;
     const step = CAMERA.RECENTER_RATE * dt;

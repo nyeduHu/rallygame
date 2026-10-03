@@ -100,6 +100,7 @@ export function CameraRig({ session, mouseLook, role, solo }: CameraRigProps) {
     }
 
     mouseLook.setPitchDownLimit(activeRole === "codriver" ? CAMERA.PASSENGER_MAX_PITCH_DOWN : CAMERA.MAX_PITCH_DOWN);
+    mouseLook.setRecentring(activeRole !== "codriver");
 
     // Head sway: local-space acceleration pushes the head the opposite way.
     const velocity = session.vehicle.body.linvel();

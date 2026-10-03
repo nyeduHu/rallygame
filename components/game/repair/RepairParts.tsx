@@ -6,20 +6,33 @@ import { COCKPIT } from "@/lib/game/cockpitLayout";
 import { REPAIR } from "@/lib/game/constants";
 import type { InteractableSpec } from "@/lib/game/interaction/interactionSystem";
 import { PALETTE } from "@/lib/game/palette";
+import { PART_NAMES } from "@/lib/game/repair/repairGuide";
 import { useGameStore } from "@/lib/game/store";
 import type { BrokenPart } from "@/lib/game/vehicle/mechanics";
 import { Interactable } from "../interaction/Interactable";
+import { Wrench } from "./Wrench";
 import { submitRepairStep } from "./submitRepairStep";
 
 const BAY = COCKPIT.ENGINE_BAY;
 const BOTH_ROLES = ["driver", "codriver"] as const;
 const TINT_BROKEN = "#e2462f";
 const PART_COLOR = "#7d828c";
-const PART_LABELS: Record<BrokenPart, string> = {
-  radiator_hose: "Radiator hose",
-  spark_plug: "Spark plugs",
-  drive_belt: "Drive belt",
+/** Colour of a freshly fitted part (matches its spare in the tray). */
+const NEW_PART_COLORS: Record<BrokenPart, string> = {
+  radiator_hose: "#3ca55c",
+  spark_plug: "#d9b23c",
+  drive_belt: "#2f5fb3",
 };
+
+/**
+ * Whether the replacement for a part is already in place.
+ * @param part - Part to check.
+ * @returns True once the new part is fitted (until the engine restarts).
+ */
+function fitted(part: BrokenPart): boolean {
+  const { repair } = useGameStore.getState();
+  return (repair.kind === "part_installed" || repair.kind === "hood_closed_repaired") && repair.part === part;
+}
 
 /** @returns True while someone can work on the engine (hood open, standing outside). */
 function canWork(): boolean {
@@ -49,7 +62,13 @@ function installedSpec(part: BrokenPart): InteractableSpec {
     kind: "press",
     roles: BOTH_ROLES,
     isEnabled: () => canWork() && installed(part),
-    label: PART_LABELS[part],
+    label: () => {
+      const { repair } = useGameStore.getState();
+      if (repair.kind === "tool_in_hand") return `Take out the ${PART_NAMES[part]} with the wrench`;
+      if (repair.kind === "diagnosed") return repair.part === part ? `Broken ${PART_NAMES[part]}: grab the wrench first` : `Engine ${PART_NAMES[part]}`;
+      if (repair.kind === "hood_open") return `Inspect the ${PART_NAMES[part]}`;
+      return `Engine ${PART_NAMES[part]}`;
+    },
     getObjects: () => [],
     onPress: () => {
       const { repair } = useGameStore.getState();
@@ -71,7 +90,7 @@ function capSpec(): InteractableSpec {
       const { repair } = useGameStore.getState();
       return canWork() && (repair.kind === "hood_open" || repair.kind === "cap_watered");
     },
-    label: "Radiator cap",
+    label: () => (useGameStore.getState().repair.kind === "cap_watered" ? "Screw the radiator cap back on" : "Unscrew the radiator cap"),
     getObjects: () => [],
     onPress: () => {
       const { repair } = useGameStore.getState();
@@ -91,7 +110,7 @@ function waterSpec(): InteractableSpec {
     kind: "hold",
     roles: BOTH_ROLES,
     isEnabled: () => useGameStore.getState().footRole !== null && useGameStore.getState().repair.kind === "cap_off",
-    label: "Pour water (hold)",
+    label: "Pour water into the radiator",
     getObjects: () => [],
     onPress: () => {
       fired = false;
@@ -115,8 +134,8 @@ function spareSpec(part: BrokenPart): InteractableSpec {
     id: `spare-${part}`,
     kind: "press",
     roles: BOTH_ROLES,
-    isEnabled: () => useGameStore.getState().footRole !== null,
-    label: `Fit spare ${PART_LABELS[part].toLowerCase()}`,
+    isEnabled: () => useGameStore.getState().footRole !== null && !fitted(part),
+    label: () => (useGameStore.getState().repair.kind === "part_removed" ? `Fit the new ${PART_NAMES[part]}` : `New ${PART_NAMES[part]} (take the broken one out first)`),
     getObjects: () => [],
     onPress: () => submitRepairStep({ step: "INSTALL_NEW", partId: part }),
   };
@@ -128,15 +147,17 @@ interface TintedProps {
 }
 
 /**
- * Renders a part group that is hidden while removed and tinted red when it is the broken one.
+ * Renders a part group that is hidden while removed, red while it is the broken one and in the
+ * colour of the new part once it has been replaced.
  * @param props - Part id and a render function receiving the tint colour.
  * @returns Part group.
  */
 function Visible({ part, children }: TintedProps) {
   const broken = useGameStore((state) => state.mech.brokenPart === part && state.hoodOpen);
+  const replaced = useGameStore((state) => (state.repair.kind === "part_installed" || state.repair.kind === "hood_closed_repaired") && state.repair.part === part);
   const removed = useGameStore((state) => state.repair.kind === "part_removed" && state.repair.part === part);
   const hoodOpen = useGameStore((state) => state.hoodOpen);
-  return <group visible={!removed && hoodOpen}>{children(broken ? TINT_BROKEN : PART_COLOR)}</group>;
+  return <group visible={!removed && hoodOpen}>{children(replaced ? NEW_PART_COLORS[part] : broken ? TINT_BROKEN : PART_COLOR)}</group>;
 }
 
 /**
@@ -168,8 +189,11 @@ export function RepairParts() {
       id: "toolbox-tool",
       kind: "press",
       roles: BOTH_ROLES,
-      isEnabled: () => useGameStore.getState().footRole !== null,
-      label: "Grab wrench",
+      isEnabled: () => {
+        const { footRole, repair } = useGameStore.getState();
+        return footRole !== null && repair.kind !== "tool_in_hand" && repair.kind !== "part_removed";
+      },
+      label: () => (useGameStore.getState().repair.kind === "diagnosed" ? "Take the wrench" : "Wrench (inspect the broken part first)"),
       getObjects: () => [],
       onPress: () => submitRepairStep({ step: "GRAB_TOOL" }),
     }),
@@ -181,7 +205,7 @@ export function RepairParts() {
       kind: "press",
       roles: BOTH_ROLES,
       isEnabled: () => useGameStore.getState().footRole === null,
-      label: "Ignition",
+      label: "Start the engine",
       getObjects: () => [],
       onPress: () => submitRepairStep({ step: "IGNITION" }),
     }),
@@ -190,6 +214,8 @@ export function RepairParts() {
 
   const driverOut = useGameStore((state) => state.footRole !== null);
   const hoodOpen = useGameStore((state) => state.hoodOpen);
+  const holding = useGameStore((state) => state.repair.kind === "tool_in_hand" || state.repair.kind === "part_removed");
+  const spareFitted = useGameStore((state) => ((state.repair.kind === "part_installed" || state.repair.kind === "hood_closed_repaired") ? state.repair.part : null));
 
   const spareSlot = (index: number): [number, number, number] => [
     BAY.SPARES_X,
@@ -239,31 +265,38 @@ export function RepairParts() {
         <boxGeometry args={[...BAY.TOOLBOX.SIZE]} />
         <meshStandardMaterial color={PALETTE.steeringHub} flatShading />
       </mesh>
-      <Interactable spec={tool}>
-        <mesh position={[...BAY.TOOL_POSITION]}>
-          <boxGeometry args={[...BAY.TOOL_SIZE]} />
-          <meshStandardMaterial color={PALETTE.lever} flatShading />
-        </mesh>
-      </Interactable>
+      <group visible={!holding}>
+        <Interactable spec={tool}>
+          <group position={[...BAY.TOOL_POSITION]}>
+            <Wrench />
+          </group>
+        </Interactable>
+      </group>
 
+      <group visible={spareFitted !== "radiator_hose"}>
       <Interactable spec={spares.radiator_hose}>
         <mesh position={spareSlot(0)} rotation={[0, 0, Math.PI / 2]}>
           <cylinderGeometry args={[0.05, 0.05, 0.4, 8]} />
           <meshStandardMaterial color="#3ca55c" flatShading />
         </mesh>
       </Interactable>
+      </group>
+      <group visible={spareFitted !== "spark_plug"}>
       <Interactable spec={spares.spark_plug}>
         <mesh position={spareSlot(1)}>
           <cylinderGeometry args={[0.04, 0.04, 0.2, 8]} />
           <meshStandardMaterial color="#d9b23c" flatShading />
         </mesh>
       </Interactable>
+      </group>
+      <group visible={spareFitted !== "drive_belt"}>
       <Interactable spec={spares.drive_belt}>
         <mesh position={spareSlot(2)} rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[0.12, 0.025, 6, 14]} />
           <meshStandardMaterial color="#2f5fb3" flatShading />
         </mesh>
       </Interactable>
+      </group>
 
       <Interactable spec={water}>
         <mesh position={[...BAY.WATER_BOTTLE.POSITION]}>

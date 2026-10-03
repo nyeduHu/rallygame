@@ -29,7 +29,7 @@ function createLatchSpec(): InteractableSpec {
     kind: "hold",
     roles: ["driver", "codriver"],
     isEnabled: () => useGameStore.getState().footRole !== null,
-    label: "Hood latch (hold)",
+    label: () => (useGameStore.getState().hoodOpen ? "Close the hood" : "Open the hood"),
     getObjects: () => [],
     onPress: () => {
       fired = false;
