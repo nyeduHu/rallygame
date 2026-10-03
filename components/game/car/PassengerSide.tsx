@@ -11,7 +11,7 @@ import { PALETTE } from "@/lib/game/palette";
 import type { SessionView } from "@/lib/game/sessionView";
 import type { Role } from "@/lib/game/roles";
 import { useGameStore } from "@/lib/game/store";
-import { Beam, beamTransform } from "./Beam";
+import { beamTransform } from "./Beam";
 import { Tablet } from "./Tablet";
 import { WiperSwitch } from "./WiperSwitch";
 import { Interactable } from "../interaction/Interactable";
@@ -24,7 +24,7 @@ interface PassengerSideProps {
 }
 
 const CYLINDER_SEGMENTS = 8;
-const { PASSENGER_DASH_PAD, PASSENGER_GLOVEBOX, PASSENGER_TABLET_MOUNT } = COCKPIT;
+const { PASSENGER_DASH_PAD, PASSENGER_GLOVEBOX, PASSENGER_TABLET_LAP } = COCKPIT;
 
 interface BoxPartProps {
   position: Vec3;
@@ -139,24 +139,14 @@ export function PassengerSide({ session, activeRole }: PassengerSideProps) {
 
       <WiperSwitch />
 
-      <group name="passenger-tablet-mount" visible={activeRole === "codriver"}>
-        <BoxPart
-          position={PASSENGER_TABLET_MOUNT.BASE_POSITION}
-          size={PASSENGER_TABLET_MOUNT.BASE_SIZE}
-          color={PALETTE.interior}
-        />
-        <Beam
-          from={PASSENGER_TABLET_MOUNT.ARM_FROM}
-          to={PASSENGER_TABLET_MOUNT.ARM_TO}
-          thickness={PASSENGER_TABLET_MOUNT.ARM_THICKNESS}
-          color={PALETTE.lever}
-        />
-        <group
-          position={[...PASSENGER_TABLET_MOUNT.PLATE_POSITION]}
-          rotation={[PASSENGER_TABLET_MOUNT.PLATE_TILT, 0, 0]}
-        >
-          <Tablet session={session} activeRole={activeRole} />
-        </group>
+      <group
+        name="passenger-tablet-lap"
+        visible={activeRole === "codriver"}
+        position={[...PASSENGER_TABLET_LAP.POSITION]}
+        rotation={[PASSENGER_TABLET_LAP.TILT, 0, 0]}
+        scale={PASSENGER_TABLET_LAP.SCALE}
+      >
+        <Tablet session={session} activeRole={activeRole} />
       </group>
 
       <InteractionDemoCube />

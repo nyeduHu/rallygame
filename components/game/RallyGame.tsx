@@ -3,7 +3,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { CAMERA, RENDER } from "@/lib/game/constants";
+import { CAMERA, MAZE_MAP, RENDER } from "@/lib/game/constants";
 import { KeyboardControls } from "@/lib/game/input/keyboardControls";
 import { MouseLook } from "@/lib/game/input/mouseLook";
 import { useGameStore } from "@/lib/game/store";
@@ -81,8 +81,9 @@ export function RallyGame({ seed, role, solo, online }: RallyGameProps) {
   useEffect(() => {
     setRole(role);
     setSoloActiveRole(role);
+    if (role === "codriver") mouseLook.pitch = -MAZE_MAP.START_PITCH_DOWN_RAD;
     return keyboard.onRoleSwapChange((held) => setSoloActiveRole(held ? (role === "driver" ? "codriver" : "driver") : role));
-  }, [keyboard, role, setRole, setSoloActiveRole]);
+  }, [keyboard, mouseLook, role, setRole, setSoloActiveRole]);
 
   useEffect(() => () => mouseLook.detach(), [mouseLook]);
 

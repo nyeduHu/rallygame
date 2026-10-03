@@ -46,15 +46,11 @@ export const COCKPIT = {
     LEVER_POSITION: [-0.72, 0.405, 0.69] as Vec3,
     LEVER_SIZE: [0.025, 0.075, 0.025] as Vec3,
   },
-  PASSENGER_TABLET_MOUNT: {
-    BASE_POSITION: [-0.4, 0.365, 0.56] as Vec3,
-    BASE_SIZE: [0.28, 0.035, 0.12] as Vec3,
-    ARM_FROM: [-0.4, 0.38, 0.55] as Vec3,
-    ARM_TO: [-0.4, 0.49, 0.43] as Vec3,
-    ARM_THICKNESS: 0.035,
-    PLATE_POSITION: [-0.4, 0.53, 0.42] as Vec3,
-    PLATE_SIZE: [0.7, 0.42, 0.055] as Vec3,
-    PLATE_TILT: -0.34,
+  /** The tablet rests on the co-driver's lap, tipped up so its screen faces their eyes. */
+  PASSENGER_TABLET_LAP: {
+    POSITION: [PASSENGER_X, 0.1, 0.0] as Vec3,
+    TILT: 0.85,
+    SCALE: 1.15,
   },
   /** Hood, engine bay parts, toolbox and ignition (car-local; front of the car is +z). */
   ENGINE_BAY: {

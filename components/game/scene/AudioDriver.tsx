@@ -17,7 +17,7 @@ interface AudioDriverProps {
 }
 
 /**
- * Starts audio on the first user gesture, mutes with M, and feeds the engine, tyre, rain and
+ * Starts audio on the first user gesture, mutes with N, and feeds the engine, tyre, rain and
  * wiper sounds every frame. Co-drivers hear the same mix, driven by the snapshot-based session.
  * @param props - Session for engine and tyre values.
  * @returns Nothing visible.
@@ -30,7 +30,7 @@ export function AudioDriver({ session }: AudioDriverProps) {
     const start = (): void => audio.start();
     const onKey = (event: KeyboardEvent): void => {
       audio.start();
-      if (event.code === "KeyM" && !event.repeat) audio.toggleMute();
+      if (event.code === "KeyN" && !event.repeat) audio.toggleMute();
     };
     window.addEventListener("pointerdown", start);
     window.addEventListener("keydown", onKey);

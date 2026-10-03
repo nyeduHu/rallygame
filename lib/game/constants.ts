@@ -826,11 +826,13 @@ export const MAZE_MAP = {
   PAN_PIXELS_PER_SECOND: 360,
   /** Whole-maze view keeps this many pixels clear around the roads. */
   FIT_MARGIN: 34,
+  /** The co-driver starts the race looking down at the tablet in their lap. */
+  START_PITCH_DOWN_RAD: 0.9,
   HINTS_PER_RACE: 3,
   HINT_TURNS: 5,
   HINT_SECONDS: 25,
   /** The co-driver must look this close to the tablet for the map keys to apply. */
-  FOCUS_HALF_ANGLE_DEG: 32,
+  FOCUS_HALF_ANGLE_RAD: 32 * DEG_TO_RAD,
   ROAD_PIXELS: 6,
   HINT_ROAD_PIXELS: 14,
   CAR_LENGTH_PX: 14,

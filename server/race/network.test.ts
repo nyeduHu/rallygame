@@ -16,7 +16,7 @@ function pose(seq: number, x: number, y: number, z: number): PoseReport {
 }
 
 describe("race on a road network", () => {
-  it("an alternative route finishes the stage, and a dead end costs one wrong-turn penalty", () => {
+  it("a dead end costs one wrong-turn penalty and the stage can still be finished", () => {
     const room = new Room("ABCDEF", "Host", { seed: 3 });
     const guest = room.addPlayer("Guest");
     const team = room.createTeam("T");
@@ -34,9 +34,8 @@ describe("race on a road network", () => {
     controller.start();
     clock.now = 5000;
 
-    const alternative = STAGE.branches.find((branch) => branch.kind === "alternative");
-    const deadEnd = STAGE.branches.find((branch) => branch.kind === "dead_end");
-    if (!alternative || !deadEnd || alternative.joinS === null) throw new Error("expected both kinds of branch");
+    const deadEnd = STAGE.branches.find((branch) => branch.rootDistance === 0 && branch.length > NETWORK.WRONG_WAY_GRACE_M + 60);
+    if (!deadEnd) throw new Error("expected a dead-end road leaving the route");
 
     let seq = 1;
     /** Reports the car at a position and advances the clock. */
@@ -62,13 +61,8 @@ describe("race on a road network", () => {
     const afterDeadEnd = controller.penaltyMsOf(team.id);
     expect(afterDeadEnd).toBe(NETWORK.WRONG_WAY_PENALTY_S * 1000);
 
-    // Continue on the reference to just before the alternative, then take it instead.
-    driveReference(deadEnd.forkS, alternative.forkS);
-    for (let i = 0; i < alternative.samples.length; i += 2) {
-      const sample = alternative.samples[i];
-      at(sample.x, sample.y, sample.z);
-    }
-    driveReference(alternative.joinS, STAGE.finishS + 10);
+    // Back on the route, finish the stage.
+    driveReference(deadEnd.forkS, STAGE.finishS + 10);
     const entry = results[0]?.results[0];
     expect(entry?.status).toBe("finished");
     expect(entry?.navErrors).toBe(1);

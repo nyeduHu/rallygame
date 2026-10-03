@@ -5,7 +5,7 @@ import type { Rng } from "../random";
 import type { NetworkIndex } from "./networkIndex";
 import { leftVector, poseAt } from "./roadIndex";
 import { SHOULDER_EDGE, terrainHeightAt } from "./terrain";
-import type { CornerInfo, PropPlacement, RoadBranch, RoadSample, TerrainData } from "./types";
+import type { CornerInfo, PropPlacement, RoadSample, TerrainData } from "./types";
 
 /** Shared inputs for every scatter pass. */
 export interface ScatterContext {
