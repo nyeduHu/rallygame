@@ -1,11 +1,14 @@
 // lib/game/stage/validateStage.ts
-import { CHECKPOINT, DIFFICULTY, MAZE, ROAD } from "../constants";
+import { CHECKPOINT, DIFFICULTY, ROAD, ROAD_NETWORK } from "../constants";
 import { placePit, type Interval } from "./pitStop";
-import type { RoadBranch, StageData } from "./types";
+import type { RoadBranch, RoadSample, StageData } from "./types";
+
+/** Keeps spatial-hash keys unique for any realistic stage size. */
+const HASH_STRIDE = 100_000;
 
 /** The parts of a stage the validators need (available before terrain and props exist). */
 export type StageCandidate = Pick<StageData, "samples" | "corners" | "startS" | "finishS" | "checkpointS" | "length"> & {
-  /** Side roads, when the stage is a maze. */
+  /** Side roads, when the stage is a road network. */
   branches?: ReadonlyArray<RoadBranch>;
   /** Stretches of the route the pit must avoid. */
   zones?: ReadonlyArray<Interval>;
@@ -104,11 +107,51 @@ export function fairDifficulty(stage: StageCandidate, stageIndex = 0): Check {
   return PASS;
 }
 
-/** A maze has enough side roads to get lost in. */
-export function mazeFair(stage: StageCandidate): Check {
+/** A network has enough side roads to get lost in, and the roads keep apart. */
+export function networkFair(stage: StageCandidate): Check {
   const count = stage.branches?.length ?? 0;
-  if (count < MAZE.MIN_BRANCH_ROADS) return fail(`only ${count} side roads`);
-  if (stage.length < MAZE.MIN_SOLUTION_M || stage.length > MAZE.MAX_SOLUTION_M) return fail(`route length ${stage.length.toFixed(0)} m`);
+  if (count < ROAD_NETWORK.MIN_BRANCH_ROADS) return fail(`only ${count} side roads`);
+  if (stage.length < ROAD_NETWORK.MIN_SOLUTION_M || stage.length > ROAD_NETWORK.MAX_SOLUTION_M) return fail(`route length ${stage.length.toFixed(0)} m`);
+  return roadsSeparated(stage.samples, stage.branches ?? []);
+}
+
+/**
+ * Different roads keep their distance once a side road is past its junction.
+ * @param route - Route samples.
+ * @param branches - Side roads.
+ * @returns Failing check when two roads touch away from a junction.
+ */
+function roadsSeparated(route: ReadonlyArray<RoadSample>, branches: ReadonlyArray<RoadBranch>): Check {
+  const cell = ROAD_NETWORK.MIN_ROAD_SEPARATION_M;
+  const roads = [route, ...branches.map((branch) => branch.samples)];
+  const hash = new Map<number, Array<{ road: number; sample: RoadSample }>>();
+  const key = (cx: number, cz: number): number => cx * HASH_STRIDE + cz;
+  const exempt = (road: number, sample: RoadSample): boolean => road > 0 && sample.s < ROAD_NETWORK.SEPARATION_EXEMPT_M;
+  roads.forEach((samples, road) => {
+    for (const sample of samples) {
+      if (exempt(road, sample)) continue;
+      const k = key(Math.floor(sample.x / cell), Math.floor(sample.z / cell));
+      const bucket = hash.get(k);
+      if (bucket) bucket.push({ road, sample });
+      else hash.set(k, [{ road, sample }]);
+    }
+  });
+  const minSq = ROAD_NETWORK.MIN_ROAD_SEPARATION_M ** 2;
+  for (const [road, samples] of roads.entries()) {
+    for (const sample of samples) {
+      if (exempt(road, sample)) continue;
+      const cx = Math.floor(sample.x / cell);
+      const cz = Math.floor(sample.z / cell);
+      for (let ix = cx - 1; ix <= cx + 1; ix++) {
+        for (let iz = cz - 1; iz <= cz + 1; iz++) {
+          for (const other of hash.get(key(ix, iz)) ?? []) {
+            if (other.road === road) continue;
+            if ((other.sample.x - sample.x) ** 2 + (other.sample.z - sample.z) ** 2 < minSq) return fail(`roads ${road} and ${other.road} touch`);
+          }
+        }
+      }
+    }
+  }
   return PASS;
 }
 
@@ -124,7 +167,7 @@ export const STAGE_CHECKS: ReadonlyArray<{ name: string; run: (stage: StageCandi
   { name: "noOverlap", run: (stage) => noOverlap(stage) },
   { name: "checkpointsReachable", run: (stage) => checkpointsReachable(stage) },
   { name: "pitFits", run: (stage) => pitFits(stage) },
-  { name: "mazeFair", run: (stage) => mazeFair(stage) },
+  { name: "networkFair", run: (stage) => networkFair(stage) },
 ];
 
 /**

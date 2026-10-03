@@ -2,7 +2,7 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { BARRIER_MODEL_PATHS, MODEL_PATHS, ROCK_MODEL_PATHS, TREE_MODEL_PATHS } from "@/lib/game/assets";
 import type { KeyboardControls } from "@/lib/game/input/keyboardControls";
 import type { MouseLook } from "@/lib/game/input/mouseLook";
@@ -15,7 +15,6 @@ import { CameraRig } from "../car/CameraRig";
 import { CarRig } from "../car/CarRig";
 import { Cones } from "./Cones";
 import { Gates } from "./Gates";
-import { buildWallMesh } from "@/lib/game/stage/walls";
 import { HeldItems } from "../onfoot/HeldItems";
 import { GroundMesh } from "./GroundMesh";
 import { Lighting } from "./Lighting";
@@ -87,13 +86,11 @@ export function GameScene({
   online,
   onReady,
 }: GameSceneProps) {
-  const walls = useMemo(() => buildWallMesh(session.stage.walls), [session.stage.walls]);
   return (
     <InteractionDriver system={interactionSystem} mouseLook={mouseLook} role={role} solo={solo}>
       <Lighting session={session} />
       <GroundMesh mesh={terrain} name="terrain" />
       <GroundMesh mesh={road} name="road" />
-      <GroundMesh mesh={walls} name="maze-walls" />
       <StageProps stage={session.stage} />
       <Gates stage={session.stage} />
       <DistancePosts stage={session.stage} />

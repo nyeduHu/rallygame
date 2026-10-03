@@ -1,7 +1,7 @@
 // lib/game/stage/generateStage.ts
 import { PROPS, ROAD, VEHICLE } from "../constants";
 import { createRng, deriveSeed } from "../random";
-import { generateMaze, type MazeResult } from "./maze";
+import { generateRoadNetwork, type RoadNetworkResult } from "./roadNetwork";
 import { NetworkIndex } from "./networkIndex";
 import { clearAroundArcs, gateHalfWidth, scatterGrass, scatterRocks, scatterTrees, type ScatterContext } from "./props";
 import { poseAt } from "./roadIndex";
@@ -10,7 +10,7 @@ import { validateCandidate } from "./validateStage";
 import { clearPitArea, placePit } from "./pitStop";
 import { buildTerrain } from "./terrain";
 import type { PropPlacement, StageData } from "./types";
-import { clearWalls, elevateWalls, mazeHeight } from "./walls";
+import { networkHeight } from "./ground";
 
 /** Salts separating the random streams of each pipeline pass. */
 const SALT = {
@@ -21,22 +21,22 @@ const SALT = {
   GRASS: 5,
 } as const;
 
-/** A maze attempt that passed validation. */
-export interface ValidMaze extends MazeResult {
+/** A network attempt that passed validation. */
+export interface ValidNetwork extends RoadNetworkResult {
   attempt: number;
   checkpointS: number[];
 }
 
 /**
- * Finds the first maze attempt that validates. Attempts are derived from the seed, so every
+ * Finds the first network attempt that validates. Attempts are derived from the seed, so every
  * client converges on the same attempt.
  * @param seed - Stage seed.
  * @param stageIndex - Stage number (0 = tutorial).
- * @returns The maze and the attempt number used.
+ * @returns The network and the attempt number used.
  */
-export function findValidMaze(seed: number, stageIndex: number): ValidMaze {
+export function findValidNetwork(seed: number, stageIndex: number): ValidNetwork {
   for (let attempt = 0; attempt < ROAD.MAX_GENERATION_ATTEMPTS; attempt++) {
-    const maze = generateMaze(createRng(deriveSeed(deriveSeed(seed, SALT.LAYOUT), attempt)));
+    const maze = generateRoadNetwork(createRng(deriveSeed(deriveSeed(seed, SALT.LAYOUT), attempt)));
     if (!maze || !maze.checkpointS || !hasEnoughCorners(maze.layout)) continue;
     const { samples, corners } = maze.layout;
     const candidate = {
@@ -51,25 +51,24 @@ export function findValidMaze(seed: number, stageIndex: number): ValidMaze {
     };
     if (validateCandidate(candidate, stageIndex).ok) return { ...maze, attempt, checkpointS: maze.checkpointS };
   }
-  throw new Error(`Maze generation failed validation for seed ${seed} after ${ROAD.MAX_GENERATION_ATTEMPTS} attempts`);
+  throw new Error(`Road network generation failed validation for seed ${seed} after ${ROAD.MAX_GENERATION_ATTEMPTS} attempts`);
 }
 
 /**
- * Full generation pipeline: seed -> maze -> shared ground height -> terrain -> props -> walls.
+ * Full generation pipeline: seed -> road network -> shared ground height -> terrain -> props.
  * @param seed - Stage seed.
  * @param stageIndex - Stage number (0 = tutorial).
  * @returns Complete stage description.
  */
 export function generateStage(seed: number, stageIndex = 0): StageData {
-  const maze = findValidMaze(seed, stageIndex);
-  const { layout, branches, zones, walls, attempt, startS, finishS, checkpointS } = maze;
+  const maze = findValidNetwork(seed, stageIndex);
+  const { layout, branches, zones, attempt, startS, finishS, checkpointS } = maze;
   const samples = layout.samples;
   const terrainSeed = deriveSeed(seed, SALT.TERRAIN);
-  const ground = (x: number, z: number): number => mazeHeight(x, z, terrainSeed);
+  const ground = (x: number, z: number): number => networkHeight(x, z, terrainSeed);
   for (const road of [samples, ...branches.map((branch) => branch.samples)]) {
     for (const sample of road) sample.y = ground(sample.x, sample.z);
   }
-  elevateWalls(walls, ground);
 
   const index = new NetworkIndex(samples, branches);
   const terrain = buildTerrain([...samples, ...branches.flatMap((branch) => branch.samples)], index, terrainSeed, ground);
@@ -102,10 +101,10 @@ export function generateStage(seed: number, stageIndex = 0): StageData {
   const spawnPose = poseAt(samples, startS - VEHICLE.SPAWN_BEHIND_START);
   /**
    * @param props - Scattered props.
-   * @returns Props clear of the pit, the gates and the walls.
+   * @returns Props clear of the pit and the start and finish.
    */
   const tidy = (props: PropPlacement[]): PropPlacement[] =>
-    clearWalls(clearAroundArcs(clearPitArea(props, pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START), walls);
+    clearAroundArcs(clearPitArea(props, pit), samples, [startS, finishS], PROPS.MIN_CLEAR_RADIUS_START);
 
   return {
     seed,
@@ -125,6 +124,5 @@ export function generateStage(seed: number, stageIndex = 0): StageData {
     spawn: spawnPose,
     pit,
     branches,
-    walls,
   };
 }

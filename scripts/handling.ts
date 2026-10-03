@@ -20,7 +20,7 @@ const STAGE: StageData = {
   length: LENGTH, corners: [],
   terrain: { originX: 0, originZ: 0, cellSize: 1, cols: 0, rows: 0, heights: new Float32Array() },
   startS: 10, finishS: LENGTH - 10, checkpointS: [], trees: [], rocks: [], grass: [], barriers: [], cones: [],
-  spawn: { x: 0, y: 0, z: 0, heading: 0 }, pit: null, branches: [], walls: [],
+  spawn: { x: 0, y: 0, z: 0, heading: 0 }, pit: null, branches: [],
 };
 
 /** Yaw rate from the chassis angular velocity about the up axis. */

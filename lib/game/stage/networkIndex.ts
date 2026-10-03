@@ -1,5 +1,5 @@
 // lib/game/stage/networkIndex.ts
-import { MAZE, TERRAIN } from "../constants";
+import { ROAD_NETWORK, TERRAIN } from "../constants";
 import { projectOnSegment, type RoadProjection } from "./roadIndex";
 import type { RoadBranch, RoadSample } from "./types";
 
@@ -91,7 +91,7 @@ export class NetworkIndex {
     let bestPacked = -1;
     let bestScore = maxDistance * maxDistance;
     let bestRaw = Infinity;
-    const bias = MAZE.BRANCH_TIE_BIAS_M;
+    const bias = ROAD_NETWORK.BRANCH_TIE_BIAS_M;
     for (let ix = cx - reach; ix <= cx + reach; ix++) {
       for (let iz = cz - reach; iz <= cz + reach; iz++) {
         const bucket = this.cells.get(this.key(ix, iz));

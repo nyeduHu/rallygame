@@ -1,7 +1,7 @@
 // lib/game/stage/validateStage.test.ts
 import { describe, expect, it } from "vitest";
 import { CHECKPOINT, DIFFICULTY, ROAD } from "../constants";
-import { findValidMaze } from "./generateStage";
+import { findValidNetwork } from "./generateStage";
 import type { CornerInfo } from "./types";
 import {
   checkpointsReachable,
@@ -65,10 +65,10 @@ describe("stage validation checks", () => {
   });
 });
 
-describe("maze generation", () => {
-  it("every seed 1..200 yields a maze that passes all checks within the attempt cap", () => {
+describe("road network generation", () => {
+  it("every seed 1..200 yields a network that passes all checks within the attempt cap", () => {
     for (let seed = 1; seed <= 200; seed++) {
-      const maze = findValidMaze(seed, 0);
+      const maze = findValidNetwork(seed, 0);
       expect(maze.attempt).toBeLessThan(ROAD.MAX_GENERATION_ATTEMPTS);
       const { samples, corners } = maze.layout;
       const length = samples[samples.length - 1].s;

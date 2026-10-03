@@ -688,48 +688,54 @@ export const NETWORK = {
   WRONG_WAY_PENALTY_S: 8,
 } as const;
 
-/** Maze network: a walled grid of rooms with one route through it (the co-driver finds it on the map). */
-export const MAZE = {
+/** Rally road network: interconnecting gravel roads branching off the one route to the finish. */
+export const ROAD_NETWORK = {
   COLS: 8,
   ROWS: 5,
-  /** Room size; roads run centre to centre through doors in the walls. */
-  CELL: 130,
-  /** Corner radius range where a road turns inside a room (all 90 degree turns). */
-  FILLET_MIN: 24,
-  FILLET_MAX: 38,
-  DOOR_WIDTH: 26,
-  WALL_THICKNESS: 3,
-  WALL_HEIGHT: 5,
-  /** Walls start this far below the lowest ground under them. */
-  WALL_SINK: 2.5,
-  /** Road outside the maze before the first and after the last room (excluding half a room). */
-  LEAD_METRES: 90,
-  /** Preferred number of rooms on the correct route. */
-  TARGET_CELLS: 16,
-  /** Chance the maze grows from its newest room (long corridors) rather than a random one (more forks). */
+  /** Spacing of the junction sites the roads connect. */
+  CELL: 230,
+  /** Junction sites wander this fraction of a cell off the grid. */
+  SITE_JITTER: 0.16,
+  /** Road outside the network before the first and after the last junction site. */
+  LEAD_METRES: 140,
+  /** Preferred number of junction sites on the route to the finish. */
+  TARGET_SITES: 12,
+  /** Chance the network grows from its newest site (long roads) rather than a random one (more forks). */
   GROW_NEWEST_CHANCE: 0.55,
-  MIN_SOLUTION_M: 1400,
-  MAX_SOLUTION_M: 3600,
+  /** Sideways wobble given to the middle of each road section so it bends. */
+  BEND_OFFSET_MIN: 12,
+  BEND_OFFSET_MAX: 38,
+  /** Chance a section gets a second, opposite bend (an S). */
+  S_BEND_CHANCE: 0.35,
+  /** Corner radius limits; a corner never uses more than this share of its neighbouring sections. */
+  RADIUS_MIN: 16,
+  RADIUS_MAX: 260,
+  CORNER_SHARE: 0.45,
+  /** Side roads leave the road they hang off at an angle inside this range. */
+  FORK_ANGLE_MIN: 22 * DEG_TO_RAD,
+  FORK_ANGLE_MAX: 158 * DEG_TO_RAD,
+  MIN_SOLUTION_M: 2000,
+  MAX_SOLUTION_M: 4000,
   MIN_BRANCH_ROADS: 8,
-  /** The pit keeps this far from doors and from junctions on the route. */
-  DOOR_PIT_CLEAR_M: 18,
-  JUNCTION_PIT_CLEAR_M: 30,
+  /** The pit keeps this far from junctions on the route. */
+  JUNCTION_PIT_CLEAR_M: 45,
   /** Gates keep this far from corners and from junctions on the route. */
   GATE_CORNER_CLEAR_M: 15,
-  GATE_JUNCTION_CLEAR_M: 25,
+  GATE_JUNCTION_CLEAR_M: 30,
   GATE_SNAP_STEP_M: 5,
   /** Gentle ground shared by every road so overlapping roads agree on height. */
-  GROUND_AMPLITUDE: 3,
-  GROUND_WAVELENGTH: 240,
+  GROUND_AMPLITUDE: 5,
+  GROUND_WAVELENGTH: 340,
   /** A side road must be this much closer than the reference route to win a nearest-road query. */
   BRANCH_TIE_BIAS_M: 0.75,
-  /** Props keep this far from a wall face. */
-  WALL_PROP_CLEARANCE_M: 2.5,
+  /** Different roads stay this far apart beyond the start of a side road. */
+  MIN_ROAD_SEPARATION_M: 28,
+  SEPARATION_EXEMPT_M: 110,
 } as const;
 
-/** Co-driver map: the tablet shows the whole maze and the navigator pans, zooms and asks for hints. */
+/** Co-driver map: the tablet shows the whole road network and the navigator pans, zooms and asks for hints. */
 export const MAZE_MAP = {
-  /** Metres of maze visible top to bottom at zoom 1 in the centred view. */
+  /** Metres of network visible top to bottom at zoom 1 in the centred view. */
   CAR_VIEW_METRES: 380,
   ZOOM_MIN: 0.4,
   ZOOM_MAX: 5,

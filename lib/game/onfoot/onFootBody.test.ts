@@ -31,7 +31,7 @@ const STAGE: StageData = {
   startS: 10, finishS: LENGTH - 10, checkpointS: [], trees: [], rocks: [], grass: [], barriers: [], cones: [],
   spawn: { x: 0, y: 0, z: CAR_Z, heading: 0 },
   pit: null,
-  branches: [], walls: [],
+  branches: [],
 };
 
 /** Walks the capsule at a heading for a while and returns where it ends. */
