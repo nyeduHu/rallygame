@@ -6,6 +6,7 @@ import { clamp, lerp, moveTowards, smoothstep } from "../math";
 import type { RoadPose, SurfaceKind } from "../stage/types";
 import { getActiveTuning } from "../tuning";
 import { GROUPS } from "./collisionGroups";
+import { counterSteerAssist } from "./stabilityAssist";
 import { Drivetrain } from "./drivetrain";
 import type { Rapier } from "./rapier";
 
@@ -234,7 +235,8 @@ export class Vehicle {
       smoothstep(0, STEERING.FALLOFF_SPEED, Math.abs(this.forwardSpeed)),
     );
     // Positive steer is right; a right turn is a negative yaw about +Y.
-    const steerAngle = -this.steer * maxSteer;
+    const assist = counterSteerAssist(s.velocity.dot(s.left), this.forwardSpeed, this.handbrake);
+    const steerAngle = -clamp(this.steer + assist, -1, 1) * maxSteer;
 
     const output = this.drivetrain.update(
       { throttleKey: controls.throttle, brakeKey: controls.brake, powerFactor: controls.powerFactor },
@@ -394,6 +396,8 @@ export class Vehicle {
     let longitudinal = (driveForce * split) / WHEEL_COUNT_PER_AXLE;
     const brakeBias = wheel.isFront ? TIRE.BRAKE_FRONT_BIAS : 1 - TIRE.BRAKE_FRONT_BIAS;
     let brakeForce = (brakePedal * TIRE.BRAKE_FORCE_MAX * brakeBias) / WHEEL_COUNT_PER_AXLE;
+    // Service brakes stop short of locking the tyre so the car can still turn while braking.
+    brakeForce = Math.min(brakeForce, TIRE.BRAKE_GRIP_LIMIT * maxForce);
     if (handbrakeOnWheel) brakeForce += TIRE.HANDBRAKE_FORCE / WHEEL_COUNT_PER_AXLE;
     brakeForce += surface.rollingResistance * springForce;
     // Never let resistive forces reverse the wheel within one step (prevents jitter at rest).

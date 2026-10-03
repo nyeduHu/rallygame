@@ -11,7 +11,7 @@ describe("vehicle tuning", () => {
     const fields = listTuningFields();
     const ids = fields.map((field) => field.id);
 
-    expect(ids).toHaveLength(80);
+    expect(ids).toHaveLength(86);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain("VEHICLE.CHASSIS_HALF_EXTENTS.x");
     expect(ids).toContain("DRIVETRAIN.TORQUE_CURVE.0.0");

@@ -304,8 +304,8 @@ export const AUTOPILOT = {
 
 /** Surface grip and rolling resistance. */
 export const SURFACES = {
-  gravel: { grip: 0.92, rollingResistance: 0.018 },
-  grass: { grip: 0.62, rollingResistance: 0.06 },
+  gravel: { grip: 1.05, rollingResistance: 0.018 },
+  grass: { grip: 0.7, rollingResistance: 0.06 },
 } as const;
 
 /** Vehicle chassis and suspension. */
@@ -314,11 +314,11 @@ export const VEHICLE = {
   CHASSIS_HALF_EXTENTS: { x: 0.88, y: 0.3, z: 2.05 },
   CHASSIS_COLLIDER_OFFSET_Y: 0.12,
   CENTER_OF_MASS: { x: 0, y: -0.18, z: 0.08 },
-  /** Scales the box-derived inertia; values below one make the car rotate more eagerly. */
-  INERTIA_SCALE: 0.9,
+  /** Scales the box-derived inertia; values below one make the car rotate more eagerly (and spin more easily). */
+  INERTIA_SCALE: 1.2,
   CHASSIS_FRICTION: 0.4,
   CHASSIS_RESTITUTION: 0.15,
-  ANGULAR_DAMPING: 0.3,
+  ANGULAR_DAMPING: 1.5,
   WHEEL_RADIUS: 0.33,
   WHEEL_FRONT_Z: 1.3,
   WHEEL_REAR_Z: -1.25,
@@ -348,14 +348,16 @@ export const TIRE = {
   LATERAL_C: 1.4,
   /** Below this longitudinal speed slip angle behaves like a damper, avoiding low-speed jitter. */
   LOW_SPEED_SLIP_REFERENCE: 4,
-  FRONT_GRIP: 1.0,
+  FRONT_GRIP: 1.2,
   REAR_GRIP: 0.96,
   /** How much a saturated longitudinal force eats into lateral grip. */
-  FRICTION_ELLIPSE_LONG_WEIGHT: 0.85,
+  FRICTION_ELLIPSE_LONG_WEIGHT: 0.55,
   HANDBRAKE_FORCE: 6500,
   HANDBRAKE_REAR_LATERAL_GRIP: 0.42,
   BRAKE_FORCE_MAX: 11000,
   BRAKE_FRONT_BIAS: 0.62,
+  /** ABS-like cap: braking never uses more than this share of a tyre's grip, leaving the rest to steer with. */
+  BRAKE_GRIP_LIMIT: 0.8,
   /** Visual-only spin added to wheels that are spinning on throttle. */
   WHEELSPIN_VISUAL_GAIN: 12,
 } as const;
@@ -401,6 +403,14 @@ export const STEERING = {
   RETURN_RATE: 5.5,
   /** Visual steering wheel rotation per unit of input. */
   WHEEL_VISUAL_ROTATION: 110 * DEG_TO_RAD,
+  /** Counter-steer assist: steers toward the direction of travel when the rear steps out. */
+  ASSIST_MIN_SPEED: 4,
+  /** Sideslip (radians) where the assist starts and where it is at full strength. */
+  ASSIST_START: 8 * DEG_TO_RAD,
+  ASSIST_FULL: 30 * DEG_TO_RAD,
+  /** Steering input added per radian of sideslip, and its cap (steer units, -1..1). */
+  ASSIST_GAIN: 1.6,
+  ASSIST_MAX: 0.8,
 } as const;
 
 /** First-person and chase camera. */

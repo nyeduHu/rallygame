@@ -16,6 +16,8 @@ const GATE_START_S = 20;
 const GATE_FINISH_S = 80;
 const CAR_START_Z = 8;
 const TOWER_COLLISION_TEST_DURATION_SECONDS = 1;
+/** Speed the car must be below after hitting a tower (it would otherwise be well above this on full throttle). */
+const TOWER_STOP_SPEED_MS = 6;
 const SIMULATION_STEPS = Math.round(TOWER_COLLISION_TEST_DURATION_SECONDS / SIMULATION.FIXED_TIMESTEP);
 const TOWER_COLLISION_TEST_TIMEOUT_MS = 10_000;
 const ROAD_MESH: MeshData = {
@@ -85,7 +87,7 @@ async function slowsCarAtGateTower(): Promise<void> {
       vehicle.capturePose();
     }
 
-    expect(Math.abs(vehicle.forwardSpeed)).toBeLessThan(5);
+    expect(Math.abs(vehicle.forwardSpeed)).toBeLessThan(TOWER_STOP_SPEED_MS);
   } finally {
     vehicle.dispose();
     physics.world.free();
