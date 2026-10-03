@@ -168,3 +168,16 @@ export function makeHint(corners: ReadonlyArray<CornerInfo>, progress: number, n
 export function routeSlice(samples: ReadonlyArray<RoadSample>, fromS: number, toS: number): RoadSample[] {
   return samples.filter((sample) => sample.s >= fromS && sample.s <= toS);
 }
+
+/**
+ * How wild a corner is, 1 (fast sweeper) to 4 (tight or hairpin).
+ * @param corner - Corner of any road.
+ * @returns Severity number.
+ */
+export function cornerSeverity(corner: CornerInfo): 1 | 2 | 3 | 4 {
+  if (corner.angle >= MAZE_MAP.HAIRPIN_SEVERITY_ANGLE) return 4;
+  const [fast, medium, tight] = MAZE_MAP.SEVERITY_RADII;
+  if (corner.radius >= fast) return 1;
+  if (corner.radius >= medium) return 2;
+  return corner.radius >= tight ? 3 : 4;
+}

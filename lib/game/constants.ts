@@ -59,7 +59,7 @@ export const ROAD = {
   HEADING_SOFT_LIMIT: 70 * DEG_TO_RAD,
   /** Hairpins are only allowed when the road is roughly on its main heading. */
   HAIRPIN_HEADING_LIMIT: 30 * DEG_TO_RAD,
-  MAX_GENERATION_ATTEMPTS: 60,
+  MAX_GENERATION_ATTEMPTS: 400,
   /** No corner may be tighter than this radius. */
   MIN_RADIUS: 12,
   /** Minimum straight between consecutive corners, except deliberate linked corners. */
@@ -710,10 +710,19 @@ export const ROAD_NETWORK = {
   /** Corner radius limits; a corner never uses more than this share of its neighbouring sections. */
   RADIUS_MIN: 16,
   RADIUS_MAX: 260,
-  CORNER_SHARE: 0.45,
+  CORNER_SHARE: 0.4,
   /** Side roads leave the road they hang off at an angle inside this range. */
-  FORK_ANGLE_MIN: 22 * DEG_TO_RAD,
+  FORK_ANGLE_MIN: 16 * DEG_TO_RAD,
   FORK_ANGLE_MAX: 158 * DEG_TO_RAD,
+  /** Extra roads linking two route sites that are not neighbours on it (shortcuts and detours). */
+  ALTERNATIVE_COUNT: 3,
+  MIN_ALTERNATIVES: 2,
+  /** Sites further apart than this are not linked (a grid step is CELL, a diagonal about 1.4 CELL). */
+  ALTERNATIVE_MAX_GAP_M: 340,
+  ALTERNATIVE_SPACING_M: 40,
+  ALTERNATIVE_ANGLE_MAX: 160 * DEG_TO_RAD,
+  /** How far (as a share of the gate spacing) a checkpoint may slide to clear corners and forks. */
+  CHECKPOINT_SNAP_SHARE: 0.45,
   MIN_SOLUTION_M: 2000,
   MAX_SOLUTION_M: 4000,
   MIN_BRANCH_ROADS: 8,
@@ -756,8 +765,14 @@ export const MAZE_MAP = {
   HINT_ROAD_PIXELS: 14,
   CAR_LENGTH_PX: 14,
   CAR_HALF_WIDTH_PX: 9,
-  TURN_MARKER_RADIUS_PX: 13,
+  TURN_MARKER_RADIUS_PX: 11,
+  /** Corner severity 1 (fast) to 4 (tight): radii at or above these give 1, 2 and 3. */
+  SEVERITY_RADII: [150, 80, 42] as const,
+  HAIRPIN_SEVERITY_ANGLE: 140 * DEG_TO_RAD,
+  HINT_RING_PX: 7,
+  HINT_RING_WIDTH_PX: 4,
   FONT_PX: 20,
+  SEVERITY_FONT_PX: 16,
   TITLE_FONT_PX: 24,
   FOOTER_FONT_PX: 17,
 } as const;

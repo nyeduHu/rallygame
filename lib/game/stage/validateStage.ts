@@ -110,7 +110,9 @@ export function fairDifficulty(stage: StageCandidate, stageIndex = 0): Check {
 /** A network has enough side roads to get lost in, and the roads keep apart. */
 export function networkFair(stage: StageCandidate): Check {
   const count = stage.branches?.length ?? 0;
-  if (count < ROAD_NETWORK.MIN_BRANCH_ROADS) return fail(`only ${count} side roads`);
+  const alternatives = (stage.branches ?? []).filter((branch) => branch.kind === "alternative").length;
+  if (count - alternatives < ROAD_NETWORK.MIN_BRANCH_ROADS) return fail(`only ${count - alternatives} dead ends`);
+  if (alternatives < ROAD_NETWORK.MIN_ALTERNATIVES) return fail(`only ${alternatives} alternative routes`);
   if (stage.length < ROAD_NETWORK.MIN_SOLUTION_M || stage.length > ROAD_NETWORK.MAX_SOLUTION_M) return fail(`route length ${stage.length.toFixed(0)} m`);
   return roadsSeparated(stage.samples, stage.branches ?? []);
 }
@@ -126,7 +128,11 @@ function roadsSeparated(route: ReadonlyArray<RoadSample>, branches: ReadonlyArra
   const roads = [route, ...branches.map((branch) => branch.samples)];
   const hash = new Map<number, Array<{ road: number; sample: RoadSample }>>();
   const key = (cx: number, cz: number): number => cx * HASH_STRIDE + cz;
-  const exempt = (road: number, sample: RoadSample): boolean => road > 0 && sample.s < ROAD_NETWORK.SEPARATION_EXEMPT_M;
+  const exempt = (road: number, sample: RoadSample): boolean => {
+    if (road === 0) return false;
+    const branch = branches[road - 1];
+    return sample.s < ROAD_NETWORK.SEPARATION_EXEMPT_M || (branch.kind === "alternative" && sample.s > branch.length - ROAD_NETWORK.SEPARATION_EXEMPT_M);
+  };
   roads.forEach((samples, road) => {
     for (const sample of samples) {
       if (exempt(road, sample)) continue;

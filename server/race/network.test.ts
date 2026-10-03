@@ -34,7 +34,7 @@ describe("race on a road network", () => {
     controller.start();
     clock.now = 5000;
 
-    const deadEnd = STAGE.branches.find((branch) => branch.rootDistance === 0 && branch.length > NETWORK.WRONG_WAY_GRACE_M + 60);
+    const deadEnd = STAGE.branches.find((branch) => branch.kind === "dead_end" && branch.rootDistance === 0 && branch.length > NETWORK.WRONG_WAY_GRACE_M + 60);
     if (!deadEnd) throw new Error("expected a dead-end road leaving the route");
 
     let seq = 1;

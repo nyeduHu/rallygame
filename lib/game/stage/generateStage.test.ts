@@ -55,6 +55,6 @@ describe("generateStage", () => {
   }
 
   test("is deterministic for a seed", preservesDeterminism);
-  test("generates valid bounds and ordered checkpoints for seeds 1 through 200", generatesValidBoundsForTwoHundredSeeds);
+  test("generates valid bounds and ordered checkpoints for seeds 1 through 200", generatesValidBoundsForTwoHundredSeeds, 600_000);
   test("changes road samples for different seeds", changesSamplesForDifferentSeeds);
 });

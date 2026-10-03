@@ -8,6 +8,7 @@ import { CanvasTexture, Group, SRGBColorSpace, Vector3, type MeshBasicMaterial }
 import { MAZE_MAP, TABLET } from "@/lib/game/constants";
 import {
   createView,
+  cornerSeverity,
   makeHint,
   makeProjection,
   networkBounds,
@@ -24,6 +25,8 @@ import { PALETTE } from "@/lib/game/palette";
 import type { Role } from "@/lib/game/roles";
 import type { SessionView } from "@/lib/game/sessionView";
 import { NetworkIndex } from "@/lib/game/stage/networkIndex";
+import { poseAt } from "@/lib/game/stage/roadIndex";
+import type { CornerInfo } from "@/lib/game/stage/types";
 import { useGameStore } from "@/lib/game/store";
 
 interface TabletProps {
@@ -277,10 +280,13 @@ function drawTablet(canvas: HTMLCanvasElement, session: SessionView, data: Table
     const slice = routeSlice(stage.samples, tablet.hint.fromS, tablet.hint.toS);
     strokePath(context, slice.map((sample) => toCanvas(sample.x, sample.z)), PALETTE.steeringHub, MAZE_MAP.HINT_ROAD_PIXELS);
     strokePath(context, slice.map((sample) => toCanvas(sample.x, sample.z)), PALETTE.gravel, MAZE_MAP.ROAD_PIXELS);
-    tablet.hint.corners.forEach((corner, index) => {
-      const apex = stage.samples.find((sample) => sample.s >= corner.apexS) ?? stage.samples[0];
-      drawTurnMarker(context, toCanvas(apex.x, apex.z), String(index + 1));
-    });
+  }
+  const hinted = new Set<CornerInfo>(tablet.hint?.corners ?? []);
+  for (const road of [{ samples: stage.samples, corners: stage.corners }, ...stage.branches]) {
+    for (const corner of road.corners) {
+      const apex = poseAt(road.samples, corner.apexS);
+      drawCornerMarker(context, toCanvas(apex.x, apex.z), corner, hinted.has(corner));
+    }
   }
   const start = stage.samples.find((sample) => sample.s >= stage.startS) ?? stage.samples[0];
   const finish = stage.samples.find((sample) => sample.s >= stage.finishS) ?? stage.samples[stage.samples.length - 1];
@@ -309,25 +315,38 @@ function strokePath(context: CanvasRenderingContext2D, points: ReadonlyArray<{ x
   context.stroke();
 }
 
+/** Marker colour by corner severity. */
+const SEVERITY_COLORS = { 1: PALETTE.severity1, 2: PALETTE.severity2, 3: PALETTE.severity3, 4: PALETTE.severity4 } as const;
+
 /**
- * Draws a numbered turn marker for the hint.
+ * Draws a corner marker whose number says how wild the corner is (1 fast, 4 tight); a ring shows
+ * the corners a hint points out.
  * @param context - Canvas context.
  * @param point - Projected apex.
- * @param label - Turn number.
+ * @param corner - The corner.
+ * @param hinted - True when the active hint includes this corner.
  */
-function drawTurnMarker(context: CanvasRenderingContext2D, point: { x: number; y: number }, label: string): void {
+function drawCornerMarker(context: CanvasRenderingContext2D, point: { x: number; y: number }, corner: CornerInfo, hinted: boolean): void {
+  const severity = cornerSeverity(corner);
+  if (hinted) {
+    context.beginPath();
+    context.arc(point.x, point.y, MAZE_MAP.TURN_MARKER_RADIUS_PX + MAZE_MAP.HINT_RING_PX, 0, Math.PI * 2);
+    context.strokeStyle = PALETTE.steeringHub;
+    context.lineWidth = MAZE_MAP.HINT_RING_WIDTH_PX;
+    context.stroke();
+  }
   context.beginPath();
   context.arc(point.x, point.y, MAZE_MAP.TURN_MARKER_RADIUS_PX, 0, Math.PI * 2);
-  context.fillStyle = PALETTE.carBody;
+  context.fillStyle = SEVERITY_COLORS[severity];
   context.fill();
-  context.strokeStyle = PALETTE.gaugeFace;
+  context.strokeStyle = PALETTE.dashboard;
   context.lineWidth = TABLET.MARKER_STROKE_WIDTH;
   context.stroke();
-  context.fillStyle = PALETTE.gaugeFace;
-  context.font = `bold ${MAZE_MAP.FONT_PX}px ${FONT_FAMILY}`;
+  context.fillStyle = PALETTE.dashboard;
+  context.font = `bold ${MAZE_MAP.SEVERITY_FONT_PX}px ${FONT_FAMILY}`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, point.x, point.y + TABLET.CORNER_MARKER_BASELINE_OFFSET);
+  context.fillText(String(severity), point.x, point.y + TABLET.CORNER_MARKER_BASELINE_OFFSET);
   context.textAlign = "left";
 }
 

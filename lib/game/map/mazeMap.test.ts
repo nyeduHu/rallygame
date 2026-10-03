@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { MAZE_MAP } from "../constants";
 import type { CornerInfo } from "../stage/types";
-import { baseScale, createView, makeHint, makeProjection, nextTurns, stepView, toggleMode, type MapKeys } from "./mazeMap";
+import { baseScale, cornerSeverity, createView, makeHint, makeProjection, nextTurns, stepView, toggleMode, type MapKeys } from "./mazeMap";
 
 const BOUNDS = { minX: -100, maxX: 900, minZ: -50, maxZ: 550 };
 const VIEWPORT = { width: 1024, height: 560 };
@@ -64,5 +64,11 @@ describe("maze map view", () => {
     expect(hint?.corners).toHaveLength(MAZE_MAP.HINT_TURNS);
     expect(hint?.expiresAt).toBe(10 + MAZE_MAP.HINT_SECONDS);
     expect(makeHint(CORNERS, 10_000, 0)).toBeNull();
+  });
+
+  it("grades corners from 1 (fast) to 4 (tight)", () => {
+    const corner = (radius: number, angle = 1): CornerInfo => ({ startS: 0, endS: 10, apexS: 5, radius, angle, direction: 1, classId: "medium" });
+    expect([200, 100, 50, 30].map((radius) => cornerSeverity(corner(radius)))).toEqual([1, 2, 3, 4]);
+    expect(cornerSeverity(corner(200, 2.6))).toBe(4);
   });
 });

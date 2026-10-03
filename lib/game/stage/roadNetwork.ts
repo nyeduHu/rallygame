@@ -258,16 +258,18 @@ function nearestSample(samples: ReadonlyArray<RoadSample>, point: Vec): RoadSamp
  * Snaps the evenly spaced checkpoints to straights away from corners and junctions.
  * @param corners - Route corners.
  * @param junctions - Arc lengths of the junctions on the route.
+ * @param spans - Stretches of the route that an alternative road bypasses (no gate may sit there).
  * @param startS - Start line.
  * @param finishS - Finish line.
  * @returns Checkpoint arc lengths, or null if one cannot be placed.
  */
-function snapCheckpoints(corners: ReadonlyArray<CornerInfo>, junctions: ReadonlyArray<number>, startS: number, finishS: number): number[] | null {
+function snapCheckpoints(corners: ReadonlyArray<CornerInfo>, junctions: ReadonlyArray<number>, spans: ReadonlyArray<Interval>, startS: number, finishS: number): number[] | null {
   const blocked = (s: number): boolean =>
     corners.some((c) => s > c.startS - ROAD_NETWORK.GATE_CORNER_CLEAR_M && s < c.endS + ROAD_NETWORK.GATE_CORNER_CLEAR_M) ||
-    junctions.some((j) => Math.abs(s - j) < ROAD_NETWORK.GATE_JUNCTION_CLEAR_M);
+    junctions.some((j) => Math.abs(s - j) < ROAD_NETWORK.GATE_JUNCTION_CLEAR_M) ||
+    spans.some((span) => s > span.from - ROAD_NETWORK.GATE_JUNCTION_CLEAR_M && s < span.to + ROAD_NETWORK.GATE_JUNCTION_CLEAR_M);
   const spacing = (finishS - startS) / (ROAD.CHECKPOINT_COUNT + 1);
-  const reach = spacing / 3;
+  const reach = spacing * ROAD_NETWORK.CHECKPOINT_SNAP_SHARE;
   const result: number[] = [];
   for (let k = 0; k < ROAD.CHECKPOINT_COUNT; k++) {
     const nominal = startS + spacing * (k + 1);
@@ -346,14 +348,13 @@ export function generateRoadNetwork(rng: Rng): RoadNetworkResult | null {
   if (!route) return null;
 
   const roads: BuiltRoad[] = [];
-  let failed = false;
   /**
    * Hangs a side road off every unused tree edge at each junction site of `parent`.
    * @param parent - Road whose sites may have side roads.
    * @param isRoute - True for the route to the finish.
    */
   const spawn = (parent: BuiltRoad, isRoute: boolean): void => {
-    for (let i = 0; i < parent.nodes.length && !failed; i++) {
+    for (let i = 0; i < parent.nodes.length; i++) {
       const site = parent.nodes[i];
       if (site < 0) continue;
       const neighbours = new Set<number>();
@@ -374,46 +375,110 @@ export function generateRoadNetwork(rng: Rng): RoadNetworkResult | null {
         const { points, nodes } = chainPoints(rng, rest, position, { x: origin.x, z: origin.z });
         const leaving = unit(points[0], points[1]);
         const forkAngle = Math.acos(Math.min(1, Math.max(-1, leaving.x * Math.sin(origin.heading) + leaving.z * Math.cos(origin.heading))));
-        if (forkAngle < ROAD_NETWORK.FORK_ANGLE_MIN || forkAngle > ROAD_NETWORK.FORK_ANGLE_MAX) {
-          failed = true;
-          return;
-        }
+        // A side road that would leave at an awkward angle, or not fit, is simply left out.
+        if (forkAngle < ROAD_NETWORK.FORK_ANGLE_MIN || forkAngle > ROAD_NETWORK.FORK_ANGLE_MAX) continue;
         const road = layRoad(rng, points, nodes, site, isRoute ? origin.s : parent.forkS, isRoute ? 0 : parent.rootDistance + origin.s);
-        if (!road) {
-          failed = true;
-          return;
-        }
+        if (!road) continue;
         roads.push(road);
         spawn(road, false);
       }
     }
   };
   spawn(route, true);
-  if (failed) return null;
 
-  const branches: RoadBranch[] = roads.map((road, id) => ({
-    id,
-    kind: "dead_end",
-    forkS: road.forkS,
-    joinS: null,
-    samples: road.samples,
-    corners: road.corners,
-    length: road.samples[road.samples.length - 1].s,
-    rootDistance: road.rootDistance,
-  }));
-
-  const junctions = roads.filter((road) => road.rootDistance === 0).map((road) => road.forkS);
-  const zones: Interval[] = junctions.map((s) => ({ from: s - ROAD_NETWORK.JUNCTION_PIT_CLEAR_M, to: s + ROAD_NETWORK.JUNCTION_PIT_CLEAR_M }));
   const length = route.samples[route.samples.length - 1].s;
   const startS = ROAD.START_LINE_OFFSET;
   const finishS = length - ROAD.FINISH_LINE_OFFSET;
+  const treeJunctions = roads.filter((road) => road.rootDistance === 0).map((road) => road.forkS);
+  const alternatives = buildAlternatives(rng, route, path, position, [startS, finishS]);
+  if (alternatives.length < ROAD_NETWORK.MIN_ALTERNATIVES) return null;
+  const spans = alternatives.map((alternative) => ({ from: alternative.forkS, to: alternative.joinS }));
+  const checkpointS = snapCheckpoints(route.corners, [...treeJunctions, ...spans.flatMap((span) => [span.from, span.to])], spans, startS, finishS);
+  if (!checkpointS) return null;
+
+  const branches: RoadBranch[] = [
+    ...roads.map((road, id): RoadBranch => ({
+      id,
+      kind: "dead_end",
+      forkS: road.forkS,
+      joinS: null,
+      samples: road.samples,
+      corners: road.corners,
+      length: road.samples[road.samples.length - 1].s,
+      rootDistance: road.rootDistance,
+    })),
+    ...alternatives.map((alternative, k): RoadBranch => ({
+      id: roads.length + k,
+      kind: "alternative",
+      forkS: alternative.forkS,
+      joinS: alternative.joinS,
+      samples: alternative.road.samples,
+      corners: alternative.road.corners,
+      length: alternative.road.samples[alternative.road.samples.length - 1].s,
+      rootDistance: 0,
+    })),
+  ];
+
+  const junctions = [...treeJunctions, ...alternatives.flatMap((alternative) => [alternative.forkS, alternative.joinS])];
+  const zones: Interval[] = junctions.map((s) => ({ from: s - ROAD_NETWORK.JUNCTION_PIT_CLEAR_M, to: s + ROAD_NETWORK.JUNCTION_PIT_CLEAR_M }));
   return {
     layout: { samples: route.samples, corners: route.corners },
     branches,
     zones,
     startS,
     finishS,
-    checkpointS: snapCheckpoints(route.corners, junctions, startS, finishS),
+    checkpointS,
     routeSites: path.length,
   };
+}
+
+/** A second way between two points of the route. */
+interface Alternative {
+  road: BuiltRoad;
+  forkS: number;
+  joinS: number;
+}
+
+/**
+ * Adds roads that link two sites of the route that are not neighbours on it: shortcuts and
+ * detours the navigator can choose between. They never span the start or finish, and the
+ * checkpoints are placed outside their spans, so every route still passes every gate.
+ * @param rng - Seeded generator.
+ * @param route - The route to the finish.
+ * @param path - Sites of the route in order.
+ * @param position - World position of every site.
+ * @param gates - Arc lengths of the gates already fixed (start and finish).
+ * @returns The chosen alternatives (up to ALTERNATIVE_COUNT).
+ */
+function buildAlternatives(rng: Rng, route: BuiltRoad, path: number[], position: Vec[], gates: number[]): Alternative[] {
+  const pairs: Array<[number, number]> = [];
+  for (let a = 0; a < path.length; a++) {
+    for (let b = a + 2; b < path.length; b++) {
+      const gap = Math.hypot(position[path[a]].x - position[path[b]].x, position[path[a]].z - position[path[b]].z);
+      if (gap < ROAD_NETWORK.ALTERNATIVE_MAX_GAP_M) pairs.push([a, b]);
+    }
+  }
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+  }
+  pairs.sort((x, y) => (x[1] - x[0]) - (y[1] - y[0]));
+  const clear = ROAD_NETWORK.GATE_JUNCTION_CLEAR_M;
+  const chosen: Alternative[] = [];
+  for (const [a, b] of pairs) {
+    if (chosen.length >= ROAD_NETWORK.ALTERNATIVE_COUNT) break;
+    const from = nearestSample(route.samples, position[path[a]]);
+    const to = nearestSample(route.samples, position[path[b]]);
+    if (gates.some((gate) => gate > from.s - clear && gate < to.s + clear)) continue;
+    if (chosen.some((other) => from.s < other.joinS + ROAD_NETWORK.ALTERNATIVE_SPACING_M && to.s > other.forkS - ROAD_NETWORK.ALTERNATIVE_SPACING_M)) continue;
+    const points = [{ x: from.x, z: from.z }, ...bendPoints(rng, from, to), { x: to.x, z: to.z }];
+    const leaving = unit(points[0], points[1]);
+    const arriving = unit(points[points.length - 2], points[points.length - 1]);
+    const off = (dir: Vec, heading: number): number => Math.acos(Math.min(1, Math.max(-1, dir.x * Math.sin(heading) + dir.z * Math.cos(heading))));
+    const inRange = (angle: number): boolean => angle >= ROAD_NETWORK.FORK_ANGLE_MIN && angle <= ROAD_NETWORK.ALTERNATIVE_ANGLE_MAX;
+    if (!inRange(off(leaving, from.heading)) || !inRange(off(arriving, to.heading))) continue;
+    const road = layRoad(rng, points, points.map(() => -1), -1, from.s, 0);
+    if (road) chosen.push({ road, forkS: from.s, joinS: to.s });
+  }
+  return chosen;
 }
