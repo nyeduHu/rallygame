@@ -37,6 +37,20 @@ export function createReveal(stage: Pick<StageData, "samples" | "branches">): Re
 }
 
 /**
+ * Marks every road sample as seen (the navigator gets the full map).
+ * @param state - Reveal state (mutated).
+ */
+export function revealAll(state: RevealState): void {
+  state.revealed.forEach((flags) => flags.fill(1));
+  state.count = totalSamples(state);
+}
+
+/** @returns Total number of samples across all paths. */
+function totalSamples(state: RevealState): number {
+  return state.revealed.reduce((sum, flags) => sum + flags.length, 0);
+}
+
+/**
  * Reveals every road sample within a radius of the car.
  * @param state - Reveal state (mutated).
  * @param x - Car world x.

@@ -208,8 +208,6 @@ export const TABLET = {
   DEGREES_PER_RADIAN: 180 / Math.PI,
   HEADER_HEIGHT: 36,
   PROJECTION_SEARCH_RADIUS: 250,
-  /** The co-driver sees road within this distance of the car (fog of war beyond it). */
-  REVEAL_RADIUS_M: 250,
   /** Chevron every this many samples along revealed road. */
   ARROW_SAMPLE_INTERVAL: 75,
   FINISH_DISTANCE_STEP_M: 10,
@@ -310,7 +308,7 @@ export const SURFACES = {
 
 /** Vehicle chassis and suspension. */
 export const VEHICLE = {
-  MASS: 1250,
+  MASS: 875,
   CHASSIS_HALF_EXTENTS: { x: 0.88, y: 0.3, z: 2.05 },
   CHASSIS_COLLIDER_OFFSET_Y: 0.12,
   CENTER_OF_MASS: { x: 0, y: -0.18, z: 0.08 },

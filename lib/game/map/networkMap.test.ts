@@ -1,7 +1,7 @@
 // lib/game/map/networkMap.test.ts
 import { describe, expect, it } from "vitest";
 import type { RoadSample } from "../stage/types";
-import { computeFit, createReveal, finishDirection, fitPoint, isRevealedAt, revealedRuns, updateReveal } from "./networkMap";
+import { computeFit, createReveal, finishDirection, fitPoint, isRevealedAt, revealAll, revealedRuns, updateReveal } from "./networkMap";
 
 /** Straight road along +z with 2 m samples. */
 function line(x: number, length: number): RoadSample[] {
@@ -41,6 +41,14 @@ describe("network map fog of war", () => {
     expect(isRevealedAt(reveal.paths[1], reveal.revealed[1], 390)).toBe(false);
     updateReveal(reveal, 380, 400, 150);
     expect(isRevealedAt(reveal.paths[1], reveal.revealed[1], 390)).toBe(true);
+  });
+
+  it("revealAll shows every road, including the far end of a dead end", () => {
+    const reveal = createReveal(STAGE);
+    revealAll(reveal);
+    expect(isRevealedAt(reveal.paths[1], reveal.revealed[1], 390)).toBe(true);
+    expect(reveal.count).toBe(STAGE.samples.length + STAGE.branches[0].samples.length);
+    expect(revealedRuns(reveal.paths[0], reveal.revealed[0])).toHaveLength(1);
   });
 
   it("fits the network and points toward the finish", () => {

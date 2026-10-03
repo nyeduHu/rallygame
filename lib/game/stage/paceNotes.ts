@@ -220,15 +220,15 @@ export function generateRouteNotes(stage: Pick<StageData, "corners" | "startS" |
 }
 
 /**
- * Notes for driving along a side road: its own corners, ending with "joins main road" or
- * "road ends".
+ * Notes for driving along a side road: its own corners, ending with a neutral call.
  * @param branch - The side road.
  * @returns Notes along the branch (local arc length).
  */
 export function generateBranchNotes(branch: RoadBranch): PaceNote[] {
   return generatePaceNotes(
     { corners: branch.corners, startS: 0, finishS: branch.length },
-    { endText: branch.kind === "alternative" ? "joins main road" : "road ends" },
+    // Both kinds end with the same call so the notes never give away a dead end.
+    { endText: "keep going" },
   );
 }
 

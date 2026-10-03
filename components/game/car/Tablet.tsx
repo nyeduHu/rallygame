@@ -22,7 +22,7 @@ import {
   fitPoint,
   isRevealedAt,
   revealedRuns,
-  updateReveal,
+  revealAll,
   type MapFit,
   type RevealState,
 } from "@/lib/game/map/networkMap";
@@ -169,6 +169,8 @@ function mapViewport(): MapViewport {
  */
 function createTabletData(stage: SessionView["stage"]): TabletData {
   const reveal = createReveal(stage);
+  // The navigator sees the whole map; working out which road is right is the puzzle.
+  revealAll(reveal);
   return {
     network: new NetworkIndex(stage.samples, stage.branches),
     routeNotes: generateRouteNotes(stage),
@@ -193,14 +195,13 @@ interface Located {
  * Finds the car on the network, uncovers the road around it and picks the notes for the road it
  * is on.
  * @param session - Session with the interpolated car pose.
- * @param data - Tablet data (its fog of war is updated).
+ * @param data - Tablet data.
  * @returns Car position, progress and the active notes.
  */
 function locate(session: SessionView, data: TabletData): Located {
   const position = session.renderPosition;
   const headingVector = WORLD_FORWARD.clone().applyQuaternion(session.renderQuaternion);
   const heading = Math.atan2(headingVector.x, headingVector.z);
-  updateReveal(data.reveal, position.x, position.z, TABLET.REVEAL_RADIUS_M);
   const projection = data.network.nearest(position.x, position.z, TABLET.PROJECTION_SEARCH_RADIUS);
   const progress = projection?.s ?? session.stage.startS;
   const branchId = projection?.branchId ?? null;
