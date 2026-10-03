@@ -95,43 +95,44 @@ export class RoadIndex {
     }
     if (bestIndex < 0) return null;
 
-    const before = this.projectOnSegment(bestIndex - 1, x, z);
-    const after = this.projectOnSegment(bestIndex, x, z);
+    const before = projectOnSegment(this.samples, bestIndex - 1, x, z);
+    const after = projectOnSegment(this.samples, bestIndex, x, z);
     if (before && after) return before.distance <= after.distance ? before : after;
     return before ?? after;
   }
+}
 
-  /**
-   * Projects onto the segment [index, index + 1].
-   * @param index - Segment start sample index.
-   * @param x - World x.
-   * @param z - World z.
-   * @returns Projection or null if the segment does not exist.
-   */
-  private projectOnSegment(index: number, x: number, z: number): RoadProjection | null {
-    if (index < 0 || index >= this.samples.length - 1) return null;
-    const a = this.samples[index];
-    const b = this.samples[index + 1];
-    const sx = b.x - a.x;
-    const sz = b.z - a.z;
-    const lengthSq = sx * sx + sz * sz;
-    const t = lengthSq > 0 ? Math.min(1, Math.max(0, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq)) : 0;
-    const px = a.x + sx * t;
-    const pz = a.z + sz * t;
-    const heading = a.heading + (b.heading - a.heading) * t;
-    const leftX = Math.cos(heading);
-    const leftZ = -Math.sin(heading);
-    const dx = x - px;
-    const dz = z - pz;
-    return {
-      index,
-      s: a.s + (b.s - a.s) * t,
-      y: a.y + (b.y - a.y) * t,
-      distance: Math.hypot(dx, dz),
-      lateral: dx * leftX + dz * leftZ,
-      heading,
-    };
-  }
+/**
+ * Projects a point onto the segment [index, index + 1] of a centreline.
+ * @param samples - Centreline samples.
+ * @param index - Segment start sample index.
+ * @param x - World x.
+ * @param z - World z.
+ * @returns Projection or null if the segment does not exist.
+ */
+export function projectOnSegment(samples: ReadonlyArray<RoadSample>, index: number, x: number, z: number): RoadProjection | null {
+  if (index < 0 || index >= samples.length - 1) return null;
+  const a = samples[index];
+  const b = samples[index + 1];
+  const sx = b.x - a.x;
+  const sz = b.z - a.z;
+  const lengthSq = sx * sx + sz * sz;
+  const t = lengthSq > 0 ? Math.min(1, Math.max(0, ((x - a.x) * sx + (z - a.z) * sz) / lengthSq)) : 0;
+  const px = a.x + sx * t;
+  const pz = a.z + sz * t;
+  const heading = a.heading + (b.heading - a.heading) * t;
+  const leftX = Math.cos(heading);
+  const leftZ = -Math.sin(heading);
+  const dx = x - px;
+  const dz = z - pz;
+  return {
+    index,
+    s: a.s + (b.s - a.s) * t,
+    y: a.y + (b.y - a.y) * t,
+    distance: Math.hypot(dx, dz),
+    lateral: dx * leftX + dz * leftZ,
+    heading,
+  };
 }
 
 /**

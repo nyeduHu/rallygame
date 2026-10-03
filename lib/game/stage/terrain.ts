@@ -80,9 +80,15 @@ export function applyRoadElevation(samples: RoadSample[], seed: number): void {
  * @param samples - Elevated centreline samples of every road (reference and branches), for the bounds.
  * @param index - Nearest-road lookup over all roads.
  * @param seed - Terrain seed.
+ * @param natural - Landscape height function (defaults to the rolling hills of open stages).
  * @returns Terrain data.
  */
-export function buildTerrain(samples: ReadonlyArray<RoadSample>, index: RoadLookup, seed: number): TerrainData {
+export function buildTerrain(
+  samples: ReadonlyArray<RoadSample>,
+  index: RoadLookup,
+  seed: number,
+  natural: (x: number, z: number) => number = (x, z) => naturalHeight(x, z, seed),
+): TerrainData {
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;
@@ -104,13 +110,13 @@ export function buildTerrain(samples: ReadonlyArray<RoadSample>, index: RoadLook
     const z = originZ + row * cellSize;
     for (let col = 0; col < cols; col++) {
       const x = originX + col * cellSize;
-      const natural = naturalHeight(x, z, seed);
+      const ground = natural(x, z);
       const projection = index.nearest(x, z, ROAD_INFLUENCE);
-      let height = natural;
+      let height = ground;
       if (projection) {
         const roadBase = projection.y - ROAD.SHOULDER_DROP;
         const blend = smoothstep(FLAT_ZONE, ROAD_INFLUENCE, projection.distance);
-        height = lerp(roadBase, natural, blend);
+        height = lerp(roadBase, ground, blend);
       }
       heights[row * cols + col] = height;
     }

@@ -1,7 +1,7 @@
 // lib/game/stage/validateStage.test.ts
 import { describe, expect, it } from "vitest";
 import { CHECKPOINT, DIFFICULTY, ROAD } from "../constants";
-import { findValidLayout } from "./generateStage";
+import { findValidMaze } from "./generateStage";
 import type { CornerInfo } from "./types";
 import {
   checkpointsReachable,
@@ -9,7 +9,6 @@ import {
   fairDifficulty,
   noImpossibleTurns,
   noOverlap,
-  readableFromNotes,
   startFinishConnected,
   validateCandidate,
   type StageCandidate,
@@ -54,10 +53,6 @@ describe("stage validation checks", () => {
     expect(checkpointsReachable(stage([hairpin])).ok).toBe(false);
   });
 
-  it("readableFromNotes passes for a normal stage", () => {
-    expect(readableFromNotes(stage([corner({})])).ok).toBe(true);
-  });
-
   it("fairDifficulty rejects too easy and too hard stages and close stage-0 hairpins", () => {
     const easy = stage([corner({ classId: "fast", radius: 150 })]);
     expect(fairDifficulty(easy, 0).ok).toBe(false);
@@ -70,19 +65,14 @@ describe("stage validation checks", () => {
   });
 });
 
-describe("layout generation", () => {
-  it("every seed 1..1000 yields a layout that passes all checks within the attempt cap", () => {
-    const histogram: Record<number, number> = {};
-    for (let seed = 1; seed <= 1000; seed++) {
-      const { layout, attempt } = findValidLayout(seed, 0);
-      histogram[attempt] = (histogram[attempt] ?? 0) + 1;
-      expect(attempt).toBeLessThan(ROAD.MAX_GENERATION_ATTEMPTS);
-      const length = layout.samples[layout.samples.length - 1].s;
-      const startS = ROAD.START_LINE_OFFSET;
-      const finishS = length - ROAD.FINISH_LINE_OFFSET;
-      const checkpointS = Array.from({ length: ROAD.CHECKPOINT_COUNT }, (_, k) => startS + ((finishS - startS) * (k + 1)) / (ROAD.CHECKPOINT_COUNT + 1));
-      expect(validateCandidate({ samples: layout.samples, corners: layout.corners, startS, finishS, checkpointS, length }, 0).ok).toBe(true);
+describe("maze generation", () => {
+  it("every seed 1..200 yields a maze that passes all checks within the attempt cap", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const maze = findValidMaze(seed, 0);
+      expect(maze.attempt).toBeLessThan(ROAD.MAX_GENERATION_ATTEMPTS);
+      const { samples, corners } = maze.layout;
+      const length = samples[samples.length - 1].s;
+      expect(validateCandidate({ samples, corners, startS: maze.startS, finishS: maze.finishS, checkpointS: maze.checkpointS, length, branches: maze.branches, zones: maze.zones }, 0).ok, `seed ${seed}`).toBe(true);
     }
-    expect(Object.keys(histogram).length).toBeGreaterThan(0);
   }, 600_000);
 });

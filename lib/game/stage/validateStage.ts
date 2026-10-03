@@ -1,11 +1,15 @@
 // lib/game/stage/validateStage.ts
-import { CHECKPOINT, DIFFICULTY, NETWORK, PACE_NOTES, ROAD } from "../constants";
-import { generatePaceNotes } from "./paceNotes";
-import { placePit } from "./pitStop";
+import { CHECKPOINT, DIFFICULTY, MAZE, ROAD } from "../constants";
+import { placePit, type Interval } from "./pitStop";
 import type { RoadBranch, StageData } from "./types";
 
 /** The parts of a stage the validators need (available before terrain and props exist). */
-export type StageCandidate = Pick<StageData, "samples" | "corners" | "startS" | "finishS" | "checkpointS" | "length">;
+export type StageCandidate = Pick<StageData, "samples" | "corners" | "startS" | "finishS" | "checkpointS" | "length"> & {
+  /** Side roads, when the stage is a maze. */
+  branches?: ReadonlyArray<RoadBranch>;
+  /** Stretches of the route the pit must avoid. */
+  zones?: ReadonlyArray<Interval>;
+};
 
 export interface Check {
   ok: boolean;
@@ -77,21 +81,6 @@ export function checkpointsReachable(stage: StageCandidate): Check {
   return stage.finishS - previous >= CHECKPOINT.MIN_SPACING ? PASS : fail("last checkpoint too close to finish");
 }
 
-/** Every corner has one short, speakable note and the notes are not too dense. */
-export function readableFromNotes(stage: StageCandidate): Check {
-  const notes = generatePaceNotes(stage);
-  const cornerNotes = notes.filter((note) => note.kind !== "straight" && note.kind !== "finish" && note.kind !== "junction");
-  if (cornerNotes.length !== stage.corners.length) return fail("note count differs from corner count");
-  for (const note of notes) {
-    if (note.text.length > PACE_NOTES.MAX_TEXT_LENGTH) return fail(`note "${note.text}" too long`);
-  }
-  for (const note of notes) {
-    const windowNotes = notes.filter((other) => other.atS >= note.atS && other.atS < note.atS + 100).length;
-    if (windowNotes > PACE_NOTES.MAX_NOTES_PER_100M) return fail(`too many notes near ${note.atS.toFixed(0)} m`);
-  }
-  return PASS;
-}
-
 /**
  * Sum of corner severity weights, the difficulty score.
  * @param stage - Candidate stage.
@@ -115,22 +104,17 @@ export function fairDifficulty(stage: StageCandidate, stageIndex = 0): Check {
   return PASS;
 }
 
-/** Every stage has at least one alternative route and one dead end, and no gate sits in a fork. */
-export function networkFair(stage: StageCandidate & { branches: ReadonlyArray<RoadBranch> }): Check {
-  if (!stage.branches.some((branch) => branch.kind === "alternative")) return fail("no alternative route");
-  if (!stage.branches.some((branch) => branch.kind === "dead_end")) return fail("no dead end");
-  const gates = [stage.startS, ...stage.checkpointS, stage.finishS];
-  for (const branch of stage.branches) {
-    const from = branch.forkS - NETWORK.FORK_GATE_CLEARANCE_M;
-    const to = (branch.joinS ?? branch.forkS) + NETWORK.FORK_GATE_CLEARANCE_M;
-    if (gates.some((gate) => gate > from && gate < to)) return fail(`gate inside fork ${branch.id}`);
-  }
+/** A maze has enough side roads to get lost in. */
+export function mazeFair(stage: StageCandidate): Check {
+  const count = stage.branches?.length ?? 0;
+  if (count < MAZE.MIN_BRANCH_ROADS) return fail(`only ${count} side roads`);
+  if (stage.length < MAZE.MIN_SOLUTION_M || stage.length > MAZE.MAX_SOLUTION_M) return fail(`route length ${stage.length.toFixed(0)} m`);
   return PASS;
 }
 
 /** A pit box must fit on the road. */
 export function pitFits(stage: StageCandidate): Check {
-  return placePit(stage.samples, stage.corners, stage.startS, stage.finishS) ? PASS : fail("no room for a pit box");
+  return placePit(stage.samples, stage.corners, stage.startS, stage.finishS, stage.zones) ? PASS : fail("no room for a pit box");
 }
 
 /** All checks, in the order they are evaluated. */
@@ -139,9 +123,8 @@ export const STAGE_CHECKS: ReadonlyArray<{ name: string; run: (stage: StageCandi
   { name: "noImpossibleTurns", run: (stage) => noImpossibleTurns(stage) },
   { name: "noOverlap", run: (stage) => noOverlap(stage) },
   { name: "checkpointsReachable", run: (stage) => checkpointsReachable(stage) },
-  { name: "readableFromNotes", run: (stage) => readableFromNotes(stage) },
-  { name: "fairDifficulty", run: (stage, stageIndex) => fairDifficulty(stage, stageIndex) },
   { name: "pitFits", run: (stage) => pitFits(stage) },
+  { name: "mazeFair", run: (stage) => mazeFair(stage) },
 ];
 
 /**

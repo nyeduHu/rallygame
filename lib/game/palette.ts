@@ -15,6 +15,8 @@ export const PALETTE = {
   gravel: "#b89c74",
   gravelDark: "#9c8160",
   shoulder: "#a58a63",
+  mazeWall: "#8d8f93",
+  mazeWallTop: "#6a7d4a",
   carBody: "#e2462f",
   carBodyDark: "#b23522",
   interior: "#2e3138",

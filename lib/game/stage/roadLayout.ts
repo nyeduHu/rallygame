@@ -10,7 +10,7 @@ export interface RoadLayout {
 }
 
 /** Mutable cursor used while laying down segments. */
-interface LayoutCursor {
+export interface LayoutCursor {
   x: number;
   z: number;
   heading: number;
@@ -23,7 +23,7 @@ interface LayoutCursor {
  * @param cursor - Layout cursor (mutated).
  * @param length - Segment length.
  */
-function appendStraight(cursor: LayoutCursor, length: number): void {
+export function appendStraight(cursor: LayoutCursor, length: number): void {
   const steps = Math.max(1, Math.ceil(length / ROAD.SAMPLE_SPACING));
   const step = length / steps;
   const dx = Math.sin(cursor.heading) * step;
@@ -44,7 +44,7 @@ function appendStraight(cursor: LayoutCursor, length: number): void {
  * @param angle - Total turn angle (positive).
  * @param direction - 1 = left, -1 = right.
  */
-function appendArc(cursor: LayoutCursor, radius: number, angle: number, direction: 1 | -1): void {
+export function appendArc(cursor: LayoutCursor, radius: number, angle: number, direction: 1 | -1): void {
   const arcLength = radius * angle;
   const steps = Math.max(1, Math.ceil(arcLength / ROAD.SAMPLE_SPACING));
   const step = arcLength / steps;

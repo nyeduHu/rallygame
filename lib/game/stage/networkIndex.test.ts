@@ -11,8 +11,8 @@ function line(x: number, z0: number, length: number): RoadSample[] {
 
 const REFERENCE = line(0, 0, 1000).map((sample) => ({ ...sample, s: sample.z }));
 /** Alternative leaving at s=200 and rejoining at s=400 via a 300 m detour to the right. */
-const ALTERNATIVE: RoadBranch = { id: 1, kind: "alternative", forkS: 200, joinS: 400, samples: line(60, 200, 300), corners: [], length: 300 };
-const DEAD_END: RoadBranch = { id: 2, kind: "dead_end", forkS: 600, joinS: null, samples: line(-60, 600, 200), corners: [], length: 200 };
+const ALTERNATIVE: RoadBranch = { id: 1, kind: "alternative", forkS: 200, joinS: 400, samples: line(60, 200, 300), corners: [], length: 300, rootDistance: 0 };
+const DEAD_END: RoadBranch = { id: 2, kind: "dead_end", forkS: 600, joinS: null, samples: line(-60, 600, 200), corners: [], length: 200, rootDistance: 0 };
 
 describe("NetworkIndex", () => {
   const index = new NetworkIndex(REFERENCE, [ALTERNATIVE, DEAD_END]);

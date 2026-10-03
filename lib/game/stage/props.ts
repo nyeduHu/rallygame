@@ -209,38 +209,6 @@ export function placeBarriers(context: ScatterContext, corners: ReadonlyArray<Co
 }
 
 /**
- * Closes the end of every dead-end road with a row of solid barriers across it.
- * @param branches - Side roads.
- * @param terrain - Terrain for ground heights.
- * @returns Barrier placements.
- */
-export function placeDeadEndBarriers(branches: ReadonlyArray<RoadBranch>, terrain: TerrainData): PropPlacement[] {
-  const barriers: PropPlacement[] = [];
-  const pieces = Math.ceil((ROAD.WIDTH + ROAD.SHOULDER_WIDTH) / PROPS.BARRIER_LENGTH);
-  for (const branch of branches) {
-    if (branch.kind !== "dead_end") continue;
-    const end = poseAt(branch.samples, branch.length);
-    const [lx, lz] = leftVector(end.heading);
-    for (let k = 0; k < pieces; k++) {
-      const offset = (k - (pieces - 1) / 2) * PROPS.BARRIER_LENGTH;
-      const x = end.x + lx * offset;
-      const z = end.z + lz * offset;
-      barriers.push({
-        x,
-        y: terrainHeightAt(terrain, x, z),
-        z,
-        // Barrier length runs along its yaw, so turn it across the road.
-        yaw: end.heading + Math.PI / 2,
-        scale: 1,
-        variant: k % BARRIER_MODEL_PATHS.length,
-        hasCollider: true,
-      });
-    }
-  }
-  return barriers;
-}
-
-/**
  * Places knock-over cones on the inside of hairpin apexes.
  * @param context - Scatter context.
  * @param corners - Generated corners.

@@ -71,6 +71,14 @@ export function createPhysicsWorld(R: Rapier, stage: StageData, road: MeshData, 
     );
   }
 
+  for (const wall of stage.walls) {
+    world.createCollider(
+      R.ColliderDesc.cuboid(wall.halfX, wall.height / 2, wall.halfZ)
+        .setTranslation(wall.x, wall.y + wall.height / 2, wall.z)
+        .setCollisionGroups(GROUPS.props),
+    );
+  }
+
   for (const barrier of stage.barriers) {
     world.createCollider(
       R.ColliderDesc.cuboid(PROPS.BARRIER_LENGTH / 2, PROPS.BARRIER_HEIGHT / 2, PROPS.BARRIER_DEPTH / 2)

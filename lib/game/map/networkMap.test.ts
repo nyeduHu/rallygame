@@ -15,7 +15,7 @@ function spur(length: number): RoadSample[] {
 
 const STAGE = {
   samples: line(0, 1000),
-  branches: [{ id: 1, kind: "dead_end" as const, forkS: 400, joinS: null, samples: spur(400), corners: [], length: 400 }],
+  branches: [{ id: 1, kind: "dead_end" as const, forkS: 400, joinS: null, samples: spur(400), corners: [], length: 400, rootDistance: 0 }],
 };
 
 describe("network map fog of war", () => {

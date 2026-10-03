@@ -52,6 +52,20 @@ export interface RoadBranch {
   corners: CornerInfo[];
   /** Total length of the branch centreline. */
   length: number;
+  /** Metres of side road between the reference route and this branch's first sample. */
+  rootDistance: number;
+}
+
+/** Axis-aligned wall box of the maze. */
+export interface WallBox {
+  x: number;
+  z: number;
+  halfX: number;
+  halfZ: number;
+  /** Bottom height. */
+  y: number;
+  /** Total height of the box. */
+  height: number;
 }
 
 /** Metadata for one generated corner; kept for barriers now and pace notes later. */
@@ -132,4 +146,6 @@ export interface StageData {
   pit: PitInfo | null;
   /** Side roads: alternative routes and dead ends (empty for a single road). */
   branches: RoadBranch[];
+  /** Maze walls (empty for open roads). */
+  walls: WallBox[];
 }

@@ -774,3 +774,69 @@ export const NETWORK = {
   /** Corner gaps shorter than this many samples merge into one corner. */
   CORNER_MERGE_SAMPLES: 5,
 } as const;
+
+/** Maze network: a walled grid of rooms with one route through it (the co-driver finds it on the map). */
+export const MAZE = {
+  COLS: 8,
+  ROWS: 5,
+  /** Room size; roads run centre to centre through doors in the walls. */
+  CELL: 130,
+  /** Corner radius range where a road turns inside a room (all 90 degree turns). */
+  FILLET_MIN: 24,
+  FILLET_MAX: 38,
+  DOOR_WIDTH: 26,
+  WALL_THICKNESS: 3,
+  WALL_HEIGHT: 5,
+  /** Walls start this far below the lowest ground under them. */
+  WALL_SINK: 2.5,
+  /** Road outside the maze before the first and after the last room (excluding half a room). */
+  LEAD_METRES: 90,
+  /** Preferred number of rooms on the correct route. */
+  TARGET_CELLS: 16,
+  /** Chance the maze grows from its newest room (long corridors) rather than a random one (more forks). */
+  GROW_NEWEST_CHANCE: 0.55,
+  MIN_SOLUTION_M: 1400,
+  MAX_SOLUTION_M: 3600,
+  MIN_BRANCH_ROADS: 8,
+  /** The pit keeps this far from doors and from junctions on the route. */
+  DOOR_PIT_CLEAR_M: 18,
+  JUNCTION_PIT_CLEAR_M: 30,
+  /** Gates keep this far from corners and from junctions on the route. */
+  GATE_CORNER_CLEAR_M: 15,
+  GATE_JUNCTION_CLEAR_M: 25,
+  GATE_SNAP_STEP_M: 5,
+  /** Gentle ground shared by every road so overlapping roads agree on height. */
+  GROUND_AMPLITUDE: 3,
+  GROUND_WAVELENGTH: 240,
+  /** A side road must be this much closer than the reference route to win a nearest-road query. */
+  BRANCH_TIE_BIAS_M: 0.75,
+  /** Props keep this far from a wall face. */
+  WALL_PROP_CLEARANCE_M: 2.5,
+} as const;
+
+/** Co-driver map: the tablet shows the whole maze and the navigator pans, zooms and asks for hints. */
+export const MAZE_MAP = {
+  /** Metres of maze visible top to bottom at zoom 1 in the centred view. */
+  CAR_VIEW_METRES: 380,
+  ZOOM_MIN: 0.4,
+  ZOOM_MAX: 5,
+  /** Zoom change per second while Q or E is held (e-folds per second). */
+  ZOOM_RATE: 1.3,
+  /** Pan speed in screen pixels per second while WASD is held. */
+  PAN_PIXELS_PER_SECOND: 360,
+  /** Whole-maze view keeps this many pixels clear around the roads. */
+  FIT_MARGIN: 34,
+  HINTS_PER_RACE: 3,
+  HINT_TURNS: 5,
+  HINT_SECONDS: 25,
+  /** The co-driver must look this close to the tablet for the map keys to apply. */
+  FOCUS_HALF_ANGLE_DEG: 32,
+  ROAD_PIXELS: 6,
+  HINT_ROAD_PIXELS: 14,
+  CAR_LENGTH_PX: 14,
+  CAR_HALF_WIDTH_PX: 9,
+  TURN_MARKER_RADIUS_PX: 13,
+  FONT_PX: 20,
+  TITLE_FONT_PX: 24,
+  FOOTER_FONT_PX: 17,
+} as const;
