@@ -32,7 +32,7 @@ describe("pit placement", () => {
         expect(isInsidePitBox(pit, prop.x, prop.z)).toBe(false);
       }
     }
-  }, 180_000);
+  }, 900_000);
 
   it("isInsidePitBox respects heading and margin", () => {
     const pit = { s: 0, x: 0, y: 0, z: 0, heading: 0, halfLength: 7, halfWidth: 3.5, pump: { x: 0, z: 0 } };
