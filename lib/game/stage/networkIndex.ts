@@ -3,7 +3,7 @@ import { ROAD_NETWORK, TERRAIN } from "../constants";
 import { projectOnSegment, type RoadProjection } from "./roadIndex";
 import type { RoadBranch, RoadSample } from "./types";
 
-/** Projection onto the road network; `s` is the equivalent arc length on the reference route. */
+/** Projection onto the road network; `s` is race progress (route metres, whichever road the point is on). */
 export interface NetworkProjection extends RoadProjection {
   /** Branch the point is nearest to, or null for the reference route. */
   branchId: number | null;
@@ -11,20 +11,6 @@ export interface NetworkProjection extends RoadProjection {
   localS: number;
   /** Metres driven into a dead end, counted from the route (0 elsewhere). */
   deadEndDistance: number;
-}
-
-/**
- * Maps a position on a branch to the arc length it is worth on the reference route: an
- * alternative interpolates between its fork and join (so a longer detour progresses slower), a
- * dead end holds at its fork.
- * @param branch - The branch.
- * @param localS - Arc length along the branch.
- * @returns Equivalent reference arc length.
- */
-export function equivalentS(branch: RoadBranch, localS: number): number {
-  if (branch.kind === "dead_end" || branch.joinS === null) return branch.forkS;
-  const fraction = branch.length > 0 ? Math.min(1, Math.max(0, localS / branch.length)) : 0;
-  return branch.forkS + (branch.joinS - branch.forkS) * fraction;
 }
 
 /** Largest sample count of one road, used to pack (road, sample) into one number. */
@@ -41,8 +27,8 @@ interface IndexedRoad {
 }
 
 /**
- * Spatial index over the reference route and all branches in one hash, so a query costs the
- * same however many side roads a maze has. Ties go to the reference route.
+ * Spatial index over the reference route and all other roads in one hash, so a query costs the
+ * same however many roads there are. Ties go to the reference route.
  */
 export class NetworkIndex {
   private readonly roads: IndexedRoad[];
@@ -120,12 +106,16 @@ export class NetworkIndex {
     const hit = before && after ? (before.distance <= after.distance ? before : after) : (before ?? after);
     if (!hit) return null;
     if (!road.branch) return { ...hit, branchId: null, localS: hit.s, deadEndDistance: 0 };
+    const a = road.samples[hit.index];
+    const b = road.samples[hit.index + 1];
+    const t = b.s > a.s ? (hit.s - a.s) / (b.s - a.s) : 0;
+    const { progress, pendant } = road.branch;
     return {
       ...hit,
-      s: equivalentS(road.branch, hit.s),
+      s: progress[hit.index] + (progress[hit.index + 1] - progress[hit.index]) * t,
       branchId: road.branch.id,
       localS: hit.s,
-      deadEndDistance: road.branch.kind === "dead_end" ? road.branch.rootDistance + hit.s : 0,
+      deadEndDistance: pendant[hit.index] + (pendant[hit.index + 1] - pendant[hit.index]) * t,
     };
   }
 }

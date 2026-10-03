@@ -24,7 +24,6 @@ const SALT = {
 /** A network attempt that passed validation. */
 export interface ValidNetwork extends RoadNetworkResult {
   attempt: number;
-  checkpointS: number[];
 }
 
 /**
@@ -37,7 +36,7 @@ export interface ValidNetwork extends RoadNetworkResult {
 export function findValidNetwork(seed: number, stageIndex: number): ValidNetwork {
   for (let attempt = 0; attempt < ROAD.MAX_GENERATION_ATTEMPTS; attempt++) {
     const maze = generateRoadNetwork(createRng(deriveSeed(deriveSeed(seed, SALT.LAYOUT), attempt)));
-    if (!maze || !maze.checkpointS || !hasEnoughCorners(maze.layout)) continue;
+    if (!maze || !hasEnoughCorners(maze.layout)) continue;
     const { samples, corners } = maze.layout;
     const candidate = {
       samples,
@@ -49,7 +48,7 @@ export function findValidNetwork(seed: number, stageIndex: number): ValidNetwork
       branches: maze.branches,
       zones: maze.zones,
     };
-    if (validateCandidate(candidate, stageIndex).ok) return { ...maze, attempt, checkpointS: maze.checkpointS };
+    if (validateCandidate(candidate, stageIndex).ok) return { ...maze, attempt };
   }
   throw new Error(`Road network generation failed validation for seed ${seed} after ${ROAD.MAX_GENERATION_ATTEMPTS} attempts`);
 }

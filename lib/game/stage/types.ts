@@ -38,22 +38,20 @@ export interface RoadSample {
   heading: number;
 }
 
-/** A side road leaving the reference route. */
+/** A road of the network other than the route to the finish. */
 export interface RoadBranch {
   id: number;
-  /** `alternative` rejoins the reference at `joinS`; `dead_end` ends in the forest. */
-  kind: "alternative" | "dead_end";
-  /** Arc length on the reference route where the branch leaves. */
-  forkS: number;
-  /** Arc length on the reference route where an alternative rejoins; null for dead ends. */
-  joinS: number | null;
-  /** Centreline from the fork outward (local arc length starting at 0). */
+  /** Centreline from where the road leaves its parent road (local arc length starting at 0). */
   samples: RoadSample[];
   corners: CornerInfo[];
-  /** Total length of the branch centreline. */
+  /** Total length of the centreline. */
   length: number;
-  /** Metres of side road between the reference route and this branch's first sample. */
-  rootDistance: number;
+  /** Race progress (metres of route) of every sample: the route length minus the distance to the finish. */
+  progress: number[];
+  /** Metres into a dead end of every sample (0 on any road that leads somewhere). */
+  pendant: number[];
+  /** True when the road ends by joining another road (so it forms a loop). */
+  loops: boolean;
 }
 
 /** Metadata for one generated corner; kept for barriers now and pace notes later. */
@@ -132,6 +130,6 @@ export interface StageData {
   spawn: RoadPose;
   /** Pit box, or null when the road has no suitable straight. */
   pit: PitInfo | null;
-  /** Side roads: alternative routes and dead ends (empty for a single road). */
+  /** Every other road: loops and shortcuts that rejoin the network, and dead ends. */
   branches: RoadBranch[];
 }

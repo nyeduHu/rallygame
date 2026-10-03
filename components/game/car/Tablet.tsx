@@ -9,12 +9,13 @@ import { MAZE_MAP, TABLET } from "@/lib/game/constants";
 import {
   createView,
   cornerSeverity,
+  createHintContext,
   makeHint,
   makeProjection,
   networkBounds,
-  routeSlice,
   stepView,
   toggleMode,
+  type HintContext,
   type MapBounds,
   type MapHint,
   type MapKeys,
@@ -38,6 +39,7 @@ interface TabletProps {
 interface TabletData {
   network: NetworkIndex;
   bounds: MapBounds;
+  hints: HintContext;
 }
 
 /** Mutable tablet state: read and written by key handlers and the frame loop, never by render. */
@@ -80,7 +82,7 @@ export function Tablet({ session, activeRole }: TabletProps) {
   const elapsedRef = useRef(0);
   const contentKeyRef = useRef<string | null>(null);
   const stateRef = useRef<TabletState | null>(null);
-  const [data] = useState<TabletData>(() => ({ network: new NetworkIndex(session.stage.samples, session.stage.branches), bounds: networkBounds(session.stage) }));
+  const [data] = useState<TabletData>(() => ({ network: new NetworkIndex(session.stage.samples, session.stage.branches), bounds: networkBounds(session.stage), hints: createHintContext(session.stage) }));
   const position = useMemo(() => new Vector3(), []);
   const toTablet = useMemo(() => new Vector3(), []);
   const forward = useMemo(() => new Vector3(), []);
@@ -137,8 +139,7 @@ export function Tablet({ session, activeRole }: TabletProps) {
       if (event.code === "KeyM") tablet.view = toggleMode(tablet.view);
       if (event.code === "KeyH" && tablet.hintsLeft > 0) {
         const position = session.renderPosition;
-        const progress = data.network.nearest(position.x, position.z, TABLET.PROJECTION_SEARCH_RADIUS)?.s ?? session.stage.startS;
-        const hint = makeHint(session.stage.corners, progress, tablet.clock);
+        const hint = makeHint(data.hints, position.x, position.z, tablet.clock);
         if (hint) {
           tablet.hint = hint;
           tablet.hintsLeft -= 1;
@@ -277,9 +278,9 @@ function drawTablet(canvas: HTMLCanvasElement, session: SessionView, data: Table
     strokePath(context, road.map((sample) => toCanvas(sample.x, sample.z)), PALETTE.gravel, MAZE_MAP.ROAD_PIXELS);
   }
   if (tablet.hint) {
-    const slice = routeSlice(stage.samples, tablet.hint.fromS, tablet.hint.toS);
-    strokePath(context, slice.map((sample) => toCanvas(sample.x, sample.z)), PALETTE.steeringHub, MAZE_MAP.HINT_ROAD_PIXELS);
-    strokePath(context, slice.map((sample) => toCanvas(sample.x, sample.z)), PALETTE.gravel, MAZE_MAP.ROAD_PIXELS);
+    const path = tablet.hint.points.map((point) => toCanvas(point.x, point.z));
+    strokePath(context, path, PALETTE.steeringHub, MAZE_MAP.HINT_ROAD_PIXELS);
+    strokePath(context, path, PALETTE.gravel, MAZE_MAP.ROAD_PIXELS);
   }
   const hinted = new Set<CornerInfo>(tablet.hint?.corners ?? []);
   for (const road of [{ samples: stage.samples, corners: stage.corners }, ...stage.branches]) {

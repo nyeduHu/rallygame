@@ -1,6 +1,7 @@
 // lib/game/map/mazeMap.ts
 import { MAZE_MAP } from "../constants";
-import type { CornerInfo, RoadSample, StageData } from "../stage/types";
+import { SampleGraph } from "../stage/progress";
+import type { CornerInfo, StageData } from "../stage/types";
 
 /** CAR keeps the car in the middle of the screen; FULL fits the whole maze. */
 export type MapMode = "CAR" | "FULL";
@@ -37,13 +38,12 @@ export interface MapViewport {
   height: number;
 }
 
-/** A hint: the next turns on the correct route, shown for a while. */
+/** A hint: the shortest way home from the car, up to the fifth corner, shown for a while. */
 export interface MapHint {
+  /** Points of the highlighted path. */
+  points: Array<{ x: number; z: number }>;
+  /** The corners the path passes, in order. */
   corners: CornerInfo[];
-  /** Route arc length the highlighted path starts from. */
-  fromS: number;
-  /** Route arc length the highlighted path ends at. */
-  toS: number;
   expiresAt: number;
 }
 
@@ -134,39 +134,63 @@ export function makeProjection(
   };
 }
 
-/**
- * The next turns on the correct route after a progress point.
- * @param corners - Route corners.
- * @param progress - Car progress on the route.
- * @param count - How many turns to return.
- * @returns Upcoming corners in order.
- */
-export function nextTurns(corners: ReadonlyArray<CornerInfo>, progress: number, count: number): CornerInfo[] {
-  return corners.filter((corner) => corner.apexS > progress).slice(0, count);
+/** Everything needed to answer "which way is home from here". */
+export interface HintContext {
+  graph: SampleGraph;
+  /** Next hop toward the finish for every node. */
+  next: Int32Array;
+  /** Corner whose apex sits at a node. */
+  cornerAt: Map<number, CornerInfo>;
 }
 
 /**
- * Builds a hint from the car's progress.
- * @param corners - Route corners.
- * @param progress - Car progress on the route.
+ * Prepares hints for a stage: the sample graph, the way to the finish from everywhere, and where
+ * every corner is.
+ * @param stage - Stage with its route and other roads.
+ * @returns Hint context.
+ */
+export function createHintContext(stage: Pick<StageData, "samples" | "corners" | "branches">): HintContext {
+  const roads = [{ samples: stage.samples, corners: stage.corners }, ...stage.branches];
+  const graph = new SampleGraph(roads.map((road) => road.samples));
+  const finish = graph.nodeOf(0, stage.samples.length - 1);
+  const { next } = graph.distancesTo([finish]);
+  const cornerAt = new Map<number, CornerInfo>();
+  roads.forEach((road, roadIndex) => {
+    for (const corner of road.corners) {
+      const index = road.samples.findIndex((sample) => sample.s >= corner.apexS);
+      if (index >= 0) cornerAt.set(graph.nodeOf(roadIndex, index), corner);
+    }
+  });
+  return { graph, next, cornerAt };
+}
+
+/**
+ * Builds a hint: the shortest way to the finish from where the car is, through the next turns.
+ * @param context - Hint context of the stage.
+ * @param x - Car world x.
+ * @param z - Car world z.
  * @param now - Clock in seconds.
- * @returns Hint, or null when no turns remain.
+ * @returns Hint, or null when the car is already at the finish.
  */
-export function makeHint(corners: ReadonlyArray<CornerInfo>, progress: number, now: number): MapHint | null {
-  const turns = nextTurns(corners, progress, MAZE_MAP.HINT_TURNS);
-  if (turns.length === 0) return null;
-  return { corners: turns, fromS: progress, toS: turns[turns.length - 1].endS, expiresAt: now + MAZE_MAP.HINT_SECONDS };
-}
-
-/**
- * Route samples between two arc lengths.
- * @param samples - Route samples.
- * @param fromS - Start arc length.
- * @param toS - End arc length.
- * @returns The samples inside the range.
- */
-export function routeSlice(samples: ReadonlyArray<RoadSample>, fromS: number, toS: number): RoadSample[] {
-  return samples.filter((sample) => sample.s >= fromS && sample.s <= toS);
+export function makeHint(context: HintContext, x: number, z: number, now: number): MapHint | null {
+  const points: Array<{ x: number; z: number }> = [];
+  const corners: CornerInfo[] = [];
+  let node = context.graph.nearestNode(x, z);
+  while (node >= 0 && corners.length < MAZE_MAP.HINT_TURNS) {
+    const sample = context.graph.samples[node];
+    points.push({ x: sample.x, z: sample.z });
+    const corner = context.cornerAt.get(node);
+    if (corner && !corners.includes(corner)) corners.push(corner);
+    node = context.next[node];
+  }
+  if (corners.length === 0) return null;
+  // Carry on a little past the last turn so the highlight leads out of it.
+  for (let i = 0; i < MAZE_MAP.HINT_TAIL_SAMPLES && node >= 0; i++) {
+    const sample = context.graph.samples[node];
+    points.push({ x: sample.x, z: sample.z });
+    node = context.next[node];
+  }
+  return { points, corners, expiresAt: now + MAZE_MAP.HINT_SECONDS };
 }
 
 /**

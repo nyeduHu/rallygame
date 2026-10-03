@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { MAZE_MAP } from "../constants";
 import type { CornerInfo } from "../stage/types";
-import { baseScale, cornerSeverity, createView, makeHint, makeProjection, nextTurns, stepView, toggleMode, type MapKeys } from "./mazeMap";
+import { baseScale, cornerSeverity, createView, createHintContext, makeHint, makeProjection, stepView, toggleMode, type MapKeys } from "./mazeMap";
 
 const BOUNDS = { minX: -100, maxX: 900, minZ: -50, maxZ: 550 };
 const VIEWPORT = { width: 1024, height: 560 };
@@ -58,12 +58,14 @@ describe("maze map view", () => {
     expect(project(50, 0).x).toBeLessThan(project(0, 0).x);
   });
 
-  it("hints the next five turns and expires", () => {
-    expect(nextTurns(CORNERS, 250, MAZE_MAP.HINT_TURNS).map((c) => c.startS)).toEqual([300, 400, 500, 600, 700]);
-    const hint = makeHint(CORNERS, 250, 10);
-    expect(hint?.corners).toHaveLength(MAZE_MAP.HINT_TURNS);
+  it("hints the shortest way home through the next five turns, from wherever the car is", () => {
+    const samples = Array.from({ length: 401 }, (_, i) => ({ x: 0, y: 0, z: i * 2, s: i * 2, heading: 0 }));
+    const context = createHintContext({ samples, corners: CORNERS, branches: [] });
+    const hint = makeHint(context, 0, 250, 10);
+    expect(hint?.corners.map((corner) => corner.startS)).toEqual([300, 400, 500, 600, 700]);
     expect(hint?.expiresAt).toBe(10 + MAZE_MAP.HINT_SECONDS);
-    expect(makeHint(CORNERS, 10_000, 0)).toBeNull();
+    expect(hint?.points[0].z).toBeCloseTo(250, 0);
+    expect(makeHint(context, 0, 799, 0)).toBeNull();
   });
 
   it("grades corners from 1 (fast) to 4 (tight)", () => {

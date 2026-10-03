@@ -579,7 +579,7 @@ export const REFUEL = {
 /** Checkpoint spacing limits. */
 export const CHECKPOINT = {
   MIN_SPACING: 300,
-  MAX_SPACING: 900,
+  MAX_SPACING: 1300,
   /** Checkpoints keep at least this far from a hairpin apex. */
   MIN_DISTANCE_FROM_HAIRPIN_APEX: 20,
 } as const;
@@ -688,20 +688,22 @@ export const NETWORK = {
   WRONG_WAY_PENALTY_S: 8,
 } as const;
 
-/** Rally road network: interconnecting gravel roads branching off the one route to the finish. */
+/** Rally road network: interconnecting gravel roads in sectors, with one road through each checkpoint. */
 export const ROAD_NETWORK = {
-  COLS: 8,
+  COLS: 11,
   ROWS: 5,
+  /** Columns after which the network narrows to a single road (where a checkpoint stands). */
+  CUT_COLUMNS: [2, 4, 6, 8] as const,
   /** Spacing of the junction sites the roads connect. */
   CELL: 230,
   /** Junction sites wander this fraction of a cell off the grid. */
   SITE_JITTER: 0.16,
   /** Road outside the network before the first and after the last junction site. */
   LEAD_METRES: 140,
-  /** Preferred number of junction sites on the route to the finish. */
-  TARGET_SITES: 12,
   /** Chance the network grows from its newest site (long roads) rather than a random one (more forks). */
   GROW_NEWEST_CHANCE: 0.55,
+  /** Chance an extra road is added between two neighbouring sites of a sector (creating a loop). */
+  LOOP_CHANCE: 0.6,
   /** Sideways wobble given to the middle of each road section so it bends. */
   BEND_OFFSET_MIN: 12,
   BEND_OFFSET_MAX: 38,
@@ -711,25 +713,24 @@ export const ROAD_NETWORK = {
   RADIUS_MIN: 16,
   RADIUS_MAX: 260,
   CORNER_SHARE: 0.4,
-  /** Side roads leave the road they hang off at an angle inside this range. */
+  /** Roads join or leave another road at an angle inside this range. */
   FORK_ANGLE_MIN: 16 * DEG_TO_RAD,
-  FORK_ANGLE_MAX: 158 * DEG_TO_RAD,
-  /** Extra roads linking two route sites that are not neighbours on it (shortcuts and detours). */
-  ALTERNATIVE_COUNT: 3,
-  MIN_ALTERNATIVES: 2,
-  /** Sites further apart than this are not linked (a grid step is CELL, a diagonal about 1.4 CELL). */
-  ALTERNATIVE_MAX_GAP_M: 340,
-  ALTERNATIVE_SPACING_M: 40,
-  ALTERNATIVE_ANGLE_MAX: 160 * DEG_TO_RAD,
-  /** How far (as a share of the gate spacing) a checkpoint may slide to clear corners and forks. */
-  CHECKPOINT_SNAP_SHARE: 0.45,
-  MIN_SOLUTION_M: 2000,
-  MAX_SOLUTION_M: 4000,
-  MIN_BRANCH_ROADS: 8,
+  FORK_ANGLE_MAX: 160 * DEG_TO_RAD,
+  /** Samples of different roads closer than this count as connected (a junction or crossing). */
+  LINK_DISTANCE_M: 5,
+  MIN_SOLUTION_M: 1800,
+  MAX_SOLUTION_M: 4200,
+  MIN_DEAD_ENDS: 4,
+  /** Loops on the way to the finish: places where there is a real choice of route. */
+  MIN_ROUTE_LOOPS: 3,
+  /** The route must be the shortest way: its progress may differ from its arc length by this much. */
+  ROUTE_PROGRESS_TOLERANCE_M: 3,
   /** The pit keeps this far from junctions on the route. */
   JUNCTION_PIT_CLEAR_M: 45,
   /** Gates keep this far from corners and from junctions on the route. */
   GATE_CORNER_CLEAR_M: 15,
+  /** Only corners tighter than this keep a gate away (a gantry may span a long sweeper). */
+  GATE_BLOCKING_RADIUS_M: 100,
   GATE_JUNCTION_CLEAR_M: 30,
   GATE_SNAP_STEP_M: 5,
   /** Gentle ground shared by every road so overlapping roads agree on height. */
@@ -737,7 +738,7 @@ export const ROAD_NETWORK = {
   GROUND_WAVELENGTH: 340,
   /** A side road must be this much closer than the reference route to win a nearest-road query. */
   BRANCH_TIE_BIAS_M: 0.75,
-  /** Different roads stay this far apart beyond the start of a side road. */
+  /** Different roads stay this far apart except near a junction. */
   MIN_ROAD_SEPARATION_M: 28,
   SEPARATION_EXEMPT_M: 110,
 } as const;
@@ -758,6 +759,8 @@ export const MAZE_MAP = {
   START_PITCH_DOWN_RAD: 0.9,
   HINTS_PER_RACE: 3,
   HINT_TURNS: 5,
+  /** Samples of road shown beyond the fifth turn of a hint. */
+  HINT_TAIL_SAMPLES: 25,
   HINT_SECONDS: 25,
   /** The co-driver must look this close to the tablet for the map keys to apply. */
   FOCUS_HALF_ANGLE_RAD: 32 * DEG_TO_RAD,
